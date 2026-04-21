@@ -1,0 +1,14 @@
+/.gradle/
+/build/
+**/build/
+/local.properties
+/.idea/
+*.iml
+
+# Local tools and downloaded distributions
+/gradle-8.10.2/
+/gradle-8.10.2-bin.zip
+
+# OS files
+.DS_Store
+Thumbs.db

@@ -1,0 +1,28 @@
+package com.querydoc.lecturerecorder.ui
+
+import com.querydoc.lecturerecorder.recording.EnvironmentProfile
+
+data class RecorderUiState(
+    val hasMicPermission: Boolean = false,
+    val isRecording: Boolean = false,
+    val isRecordingPaused: Boolean = false,
+    val farLecturerMode: Boolean = true,
+    val pauseOnInterruptions: Boolean = true,
+    val environmentProfile: EnvironmentProfile = EnvironmentProfile.NORMAL,
+    val energySaverEnabled: Boolean = true,
+    val elapsedSeconds: Long = 0L,
+    val remainingRecordSeconds: Long = 0L,
+    val soundLevel: Float = 0f,
+    val averageSoundLevel: Float = 0f,
+    val agcGain: Float = 1f,
+    val pendingUploads: Int = 0,
+    val statusText: String = "",
+    val canPlayLocalAudio: Boolean = false,
+    val isPlayingLocalAudio: Boolean = false,
+    val isPlaybackPaused: Boolean = false,
+    val currentPlaybackItemId: String? = null,
+    val playbackPositionMs: Long = 0L,
+    val playbackDurationMs: Long = 0L,
+    val playbackStatus: String = "",
+    val recordings: List<RecordingListItem> = emptyList()
+)

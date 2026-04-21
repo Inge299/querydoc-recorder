@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Лектор Рекордер</string>
+    <string name="status_recording">Запись</string>
+    <string name="status_idle">Ожидание</string>
+    <string name="elapsed_label">Длительность: %1$s</string>
+    <string name="remaining_time_label">Осталось места примерно: %1$s</string>
+    <string name="pending_uploads_label">Ожидают загрузки: %1$d</string>
+    <string name="sound_level_label">Уровень звука</string>
+    <string name="action_stop">Стоп</string>
+    <string name="action_start">Старт</string>
+    <string name="action_take_photo">Сделать фото</string>
+    <string name="action_play_last_local">Слушать последнее</string>
+    <string name="action_stop_playback">Остановить</string>
+    <string name="action_hide_recordings">Скрыть записи</string>
+    <string name="action_show_recordings">Показать записи</string>
+    <string name="recordings_title">Записи</string>
+    <string name="photos_title">Фото</string>
+    <string name="recordings_empty">Записей пока нет</string>
+    <string name="photos_empty">Фото пока нет</string>
+    <string name="upload_prefix">Загрузка: %1$s</string>
+    <string name="cleanup_prefix">Очистка: %1$s</string>
+    <string name="action_play">Слушать</string>
+    <string name="permissions_hint">Выдайте разрешения на микрофон и камеру для записи и фото.</string>
+    <string name="crop_load_error">Не удалось открыть фото для кадрирования</string>
+    <string name="action_back">Назад</string>
+    <string name="crop_title">Подвиньте углы рамки</string>
+    <string name="action_save_crop">Сохранить фрагмент</string>
+    <string name="action_cancel">Отмена</string>
+    <string name="action_reset_crop">Сброс рамки</string>
+    <string name="action_auto_crop">Авторамка</string>
+    <string name="action_open_photo">Открыть</string>
+    <string name="action_close_preview">Закрыть просмотр</string>
+
+    <string name="photo_status_not_captured">Фото: не сделано</string>
+    <string name="photo_status_detecting">Фото снято. Ищу прямоугольник…</string>
+    <string name="photo_status_auto_found">Автораспознавание найдено. Подправьте при необходимости.</string>
+    <string name="photo_status_auto_failed">Авторамку найти не удалось. Подвиньте вручную.</string>
+    <string name="photo_status_template_applied">Применен шаблон из этого сеанса. Подправьте при необходимости.</string>
+    <string name="photo_status_manual_adjust">Фото снято. Подвиньте рамку и сохраните.</string>
+    <string name="photo_status_crop_canceled">Кадрирование отменено</string>
+    <string name="photo_status_crop_failed">Ошибка кадрирования фото</string>
+    <string name="photo_status_ready">Фото готово: %1$s</string>
+
+    <string name="playback_status_idle">Воспроизведение: ожидание</string>
+    <string name="playback_status_not_found">Воспроизведение: локальный файл не найден</string>
+    <string name="playback_status_selected_not_found">Воспроизведение: выбранная запись не найдена</string>
+    <string name="playback_status_file_removed">Воспроизведение: файл уже удален</string>
+    <string name="playback_status_completed">Воспроизведение: завершено</string>
+    <string name="playback_status_current">Воспроизведение: %1$s</string>
+    <string name="playback_status_stopped">Воспроизведение: остановлено</string>
+
+    <string name="upload_status_pending">Ожидает загрузки</string>
+    <string name="upload_status_uploading">Загружается</string>
+    <string name="upload_status_uploaded">Загружено</string>
+    <string name="upload_status_failed">Ошибка загрузки (повторы: %1$d)</string>
+    <string name="cleanup_not_scheduled">Не запланирована</string>
+    <string name="created_prefix">Создано: %1$s</string>
+    <string name="duration_prefix">Длительность: %1$s</string>
+    <string name="duration_unknown">--:--:--</string>
+
+    <string name="notification_recording_title">Запись лекции</string>
+    <string name="notification_recording_text">Идет запись</string>
+</resources>
