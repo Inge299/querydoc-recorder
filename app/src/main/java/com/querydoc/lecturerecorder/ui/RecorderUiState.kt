@@ -1,5 +1,6 @@
 package com.querydoc.lecturerecorder.ui
 
+import com.querydoc.lecturerecorder.data.remote.ConspectState
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 
 data class RecorderUiState(
@@ -24,5 +25,6 @@ data class RecorderUiState(
     val playbackPositionMs: Long = 0L,
     val playbackDurationMs: Long = 0L,
     val playbackStatus: String = "",
-    val recordings: List<RecordingListItem> = emptyList()
+    val recordings: List<RecordingListItem> = emptyList(),
+    val conspectDialog: ConspectState? = null
 )

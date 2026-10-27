@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,6 +23,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FiberManualRecord
@@ -35,7 +40,9 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -44,6 +51,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -81,7 +89,9 @@ fun RecorderScreen(
     onStopPlaybackForItem: (String) -> Unit,
     onSeekRecording: (String, Float) -> Unit,
     onDeleteRecordings: (Set<String>) -> Unit,
-    onBrightnessRequested: (Float?) -> Unit
+    onBrightnessRequested: (Float?) -> Unit,
+    onRequestConspect: (String) -> Unit,
+    onDismissConspect: () -> Unit
 ) {
     val uiState by state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -145,6 +155,8 @@ fun RecorderScreen(
                 focusedItemId = null
                 lingeringItemId = null
             }
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -473,13 +485,40 @@ fun RecorderScreen(
                                 onSeek = { id, value ->
                                     seekByItem[id] = value
                                     onSeekRecording(id, value)
-                                }
+                                },
+                                onRequestConspect = onRequestConspect
                             )
                         }
                     }
                 }
             }
         }
+    }
+
+    uiState.conspectDialog?.let { conspect ->
+        AlertDialog(
+            onDismissRequest = onDismissConspect,
+            title = { Text(if (conspect.status == "completed") "Конспект" else "Конспект не готов") },
+            text = {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 420.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        text = if (conspect.status == "completed") {
+                            conspect.markdown.ifBlank { "Конспект пуст." }
+                        } else {
+                            conspect.error.ifBlank { "Не удалось подготовить конспект." }
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = onDismissConspect) { Text("Закрыть") }
+            },
+        )
     }
 }
 
@@ -515,7 +554,8 @@ private fun RecordingItemRow(
     onPlay: (String, Float?) -> Unit,
     onPause: (String) -> Unit,
     onStop: (String) -> Unit,
-    onSeek: (String, Float) -> Unit
+    onSeek: (String, Float) -> Unit,
+    onRequestConspect: (String) -> Unit
 ) {
     val safeDuration = playbackDurationMs.coerceAtLeast(1L)
     var sliderState by remember(progress, safeDuration) { mutableFloatStateOf(progress.coerceIn(0f, 1f)) }
@@ -595,6 +635,19 @@ private fun RecordingItemRow(
                                 tint = if (isCurrent && (isPlayingNow || isPausedNow)) Color(0xFF0F172A) else Color(0xFF94A3B8),
                                 modifier = Modifier.size(16.dp)
                             )
+                        }
+                        if (item.status == UploadStatus.UPLOADED) {
+                            IconButton(
+                                modifier = Modifier.size(26.dp),
+                                onClick = { onRequestConspect(item.id) }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Description,
+                                    contentDescription = "Сделать конспект",
+                                    tint = Color(0xFF4338CA),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
                         }
                         Slider(
                             modifier = Modifier

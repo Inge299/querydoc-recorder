@@ -29,6 +29,14 @@ data class PresignedUpload(
     val materialFileId: String?,
 )
 
+data class ConspectState(
+    val sessionId: String,
+    val status: String,
+    val markdown: String,
+    val error: String,
+    val attempts: Int,
+)
+
 data class SessionProgress(
     val sessionId: String,
     val uploadedChunks: Int,
@@ -240,6 +248,71 @@ class ApiClient(context: Context) {
             ApiResult.Ok(values)
         }
     }
+
+    suspend fun finalizeConspect(sessionId: String): ApiResult<ConspectState> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("sessionId", sessionId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/finalize")
+            .post(payload.toRequestBody(JSON))
+            .build()
+        client.newCall(request).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (response.code == 202 && json?.optBoolean("accepted") == false) {
+                return@use ApiResult.Ok(
+                    ConspectState(
+                        sessionId = sessionId,
+                        status = "processing",
+                        markdown = "",
+                        error = json.optString("error"),
+                        attempts = 0,
+                    ),
+                )
+            }
+            val item = json?.optJSONObject("conspect")
+            if (!response.isSuccessful || item == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось запустить конспект" },
+                    retryable = response.code >= 500,
+                )
+            }
+            ApiResult.Ok(parseConspect(item))
+        }
+    }
+
+    suspend fun conspect(sessionId: String): ApiResult<ConspectState> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("sessionId", sessionId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/conspect")
+            .post(payload.toRequestBody(JSON))
+            .build()
+        client.newCall(request).execute().use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            val item = json?.optJSONObject("conspect")
+            if (!response.isSuccessful || item == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Конспект ещё не готов" },
+                    retryable = response.code >= 500,
+                )
+            }
+            ApiResult.Ok(parseConspect(item))
+        }
+    }
+
+    private fun parseConspect(item: JSONObject): ConspectState = ConspectState(
+        sessionId = item.optString("sessionId"),
+        status = item.optString("status"),
+        markdown = item.optString("markdown"),
+        error = item.optString("error"),
+        attempts = item.optInt("attempts"),
+    )
 
     private companion object {
         val JSON = "application/json; charset=utf-8".toMediaTypeOrNull()

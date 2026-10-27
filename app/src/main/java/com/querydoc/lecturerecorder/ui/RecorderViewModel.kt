@@ -9,6 +9,8 @@ import android.os.Build
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.querydoc.lecturerecorder.AppGraph
+import com.querydoc.lecturerecorder.data.remote.ApiResult
+import com.querydoc.lecturerecorder.data.remote.ConspectState
 import com.querydoc.lecturerecorder.config.AppConfig
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
@@ -35,6 +37,8 @@ class RecorderViewModel(
 ) : AndroidViewModel(application) {
     private val app = getApplication<Application>()
     private val dao = AppGraph.db(app).uploadQueueDao()
+    private val api = AppGraph.apiClient(app)
+    private val conspectJobs = mutableSetOf<String>()
     private val idleMicMonitor = IdleMicLevelMonitor(app)
     private val dateFormatter = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru"))
     private val durationCacheMs = mutableMapOf<String, Long>()
@@ -194,6 +198,54 @@ class RecorderViewModel(
 
     fun onAuthorizationRequested() {
         _state.update { it.copy(statusText = "Авторизация будет добавлена позже") }
+    }
+
+    fun requestConspect(sessionId: String) {
+        if (!conspectJobs.add(sessionId)) return
+        _state.update { it.copy(statusText = "Готовим конспект…", conspectDialog = null) }
+        viewModelScope.launch {
+            try {
+                var current: ConspectState? = when (val result = api.finalizeConspect(sessionId)) {
+                    is ApiResult.Ok -> result.value
+                    is ApiResult.Failure -> {
+                        _state.update {
+                            it.copy(
+                                statusText = "Не удалось запустить конспект",
+                                conspectDialog = ConspectState(sessionId, "failed", "", result.message, 0),
+                            )
+                        }
+                        return@launch
+                    }
+                }
+                var polls = 0
+                while (current != null && current.status != "completed" && current.status != "failed" && polls < 150) {
+                    delay(4_000)
+                    polls += 1
+                    when (val result = api.conspect(sessionId)) {
+                        is ApiResult.Ok -> current = result.value
+                        is ApiResult.Failure -> {
+                            if (result.status != 404 && result.status != 202) {
+                                current = ConspectState(sessionId, "failed", "", result.message, 0)
+                            }
+                        }
+                    }
+                }
+                val finalState = current
+                if (finalState != null && finalState.status == "completed") {
+                    _state.update { it.copy(statusText = "Конспект готов", conspectDialog = finalState) }
+                } else if (finalState != null && finalState.status == "failed") {
+                    _state.update { it.copy(statusText = "Конспект не готов", conspectDialog = finalState) }
+                } else {
+                    _state.update { it.copy(statusText = "Конспект готовится дольше обычного") }
+                }
+            } finally {
+                conspectJobs.remove(sessionId)
+            }
+        }
+    }
+
+    fun dismissConspect() {
+        _state.update { it.copy(conspectDialog = null) }
     }
 
     fun playRecordingById(id: String, startFraction: Float?) {

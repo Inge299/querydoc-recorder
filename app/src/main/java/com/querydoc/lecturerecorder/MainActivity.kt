@@ -94,7 +94,9 @@ class MainActivity : ComponentActivity() {
                             onStopPlaybackForItem = viewModel::stopPlaybackForItem,
                             onSeekRecording = viewModel::seekPlaybackPosition,
                             onDeleteRecordings = viewModel::deleteRecordings,
-                            onBrightnessRequested = ::applyScreenBrightness
+                            onBrightnessRequested = ::applyScreenBrightness,
+                            onRequestConspect = viewModel::requestConspect,
+                            onDismissConspect = viewModel::dismissConspect
                         )
                             else -> LoginScreen(api = api, onLoggedIn = { loggedIn = true })
                         }
