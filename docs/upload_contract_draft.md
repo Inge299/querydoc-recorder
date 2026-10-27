@@ -13,7 +13,7 @@ This client is implemented around a queue and chunked uploads.
 On backend, before transcription, **always run loudness normalization and denoise**.
 This is the biggest quality boost for ASR, especially for quiet or distant lecturers.
 
-## Suggested endpoints
+## Implemented endpoints
 
 ### 1) Request upload target
 
@@ -36,12 +36,16 @@ Response body:
   "uploadUrl": "https://...",
   "method": "PUT",
   "headers": {
-    "Content-Type": "audio/mp4"
+    "content-type": "audio/mp4"
   },
-  "storageKey": "mobile/.../chunk_0001.m4a",
-  "expiresAt": "2026-04-16T12:00:00Z"
+  "storageKey": "<userId>/audio-chunks/<sessionId>/000000-<uuid>.m4a",
+  "uploadSessionId": "...",
+  "expiresAt": "2026-04-16T12:00:00Z",
+  "accepted": true
 }
 ```
+
+A duplicate `chunkId` returns HTTP 200 with `{ "duplicate": true, "accepted": true, "materialFileId": "..." }` and no upload URL.
 
 ### 2) Confirm upload
 
@@ -50,12 +54,11 @@ Response body:
 Request body:
 ```json
 {
-  "chunkId": "uuid",
-  "sessionId": "uuid",
-  "storageKey": "mobile/.../chunk_0001.m4a",
-  "etag": "\"abcd...\""
+  "uploadSessionId": "..."
 }
 ```
+
+`chunkId` is accepted as a fallback when `uploadSessionId` is not sent. Completion is idempotent.
 
 Response body:
 ```json
@@ -63,6 +66,10 @@ Response body:
   "accepted": true
 }
 ```
+
+## S3 requirements
+
+The platform must run with `STORAGE_DRIVER=s3`. The presigned URL includes `x-amz-content-sha256=UNSIGNED-PAYLOAD`; the S3-compatible endpoint must accept a plain `PUT` with the returned `content-type` header. `S3_REGION` must match the endpoint (Selectel virtual-hosted buckets use `ru-7`).
 
 ## Idempotency requirements
 

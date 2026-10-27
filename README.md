@@ -12,15 +12,30 @@ Android MVP for long lecture recording with:
 
 ## Current status
 
-This project is a hand-crafted skeleton and is ready to be opened in Android Studio.
+The recorder is integrated with the QueryDoc mobile API: phone/password login, persistent session cookie, S3 presigned PUT via `querydoc-platform`, completion, and WorkManager retries. Unit tests cover chunk metadata parsing; `assembleDebug` and `lintDebug` pass.
 
-Because this environment does not have `gradle`/Android SDK configured, build verification was not executed here.
+Still missing for the full product:
 
-## Next implementation steps
+1. Session finalize endpoint and automatic conspect generation after all chunks are uploaded.
+2. In-app transcript/conspect screen (the current release uploads and hands off to the web workspace).
+3. Release signing and device/E2E verification.
+4. Diagnostics viewer for the last N lines of the log.
 
-1. Replace `StubUploadRepository` with real `querydoc-platform` upload API integration.
-2. Replace heuristic rectangle detector with OpenCV contour-based detector.
-3. Add simple diagnostics viewer screen (read last N lines of log).
+## Build
+
+```bash
+./gradlew :app:assembleDebug
+./gradlew :app:testDebugUnitTest
+./gradlew :app:lintDebug
+```
+
+The API base URL defaults to `https://querydoc.ru`. Override it for an emulator or staging:
+
+```bash
+./gradlew :app:assembleDebug -Pquerydoc.apiBaseUrl=http://10.0.2.2:3000
+```
+
+HTTP cleartext for emulator builds is not enabled by default; use an HTTPS staging URL or add a debug-only network security config.
 
 ## Transcription pipeline recommendation
 
