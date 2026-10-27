@@ -46,6 +46,11 @@ class PersistentCookieJar(context: Context) : CookieJar {
         readEntries().any { it.second.name == "token" && it.second.expiresAt > System.currentTimeMillis() }
     }
 
+    fun cookieValue(name: String): String? = synchronized(this) {
+        val now = System.currentTimeMillis()
+        readEntries().firstOrNull { it.second.name == name && it.second.expiresAt > now }?.second?.value
+    }
+
     fun clear() = synchronized(this) { prefs.edit().remove(KEY).apply() }
 
     private fun readEntries(): MutableList<Pair<String, Cookie>> {

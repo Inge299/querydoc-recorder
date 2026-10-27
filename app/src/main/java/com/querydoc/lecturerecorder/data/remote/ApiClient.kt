@@ -52,7 +52,7 @@ class ApiClient(context: Context) {
     fun hasSession(): Boolean = cookieJar.hasSessionCookie()
 
     suspend fun login(phone: String, password: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
-        val body = JSONObject().put("login", phone.trim()).put("password", password).toString()
+        val body = JSONObject().put("login", phone.trim()).put("password", password).put("rememberDevice", true).toString()
         val request = Request.Builder()
             .url("$baseUrl/api/auth/login")
             .post(body.toRequestBody(JSON))
@@ -80,6 +80,26 @@ class ApiClient(context: Context) {
         cookieJar.clear()
     }
 
+    suspend fun restoreSession(): Boolean = withContext(Dispatchers.IO) {
+        if (cookieJar.hasSessionCookie()) return@withContext true
+        val deviceId = cookieJar.cookieValue("deviceId") ?: return@withContext false
+        val body = JSONObject().put("deviceId", deviceId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/verify-device")
+            .post(body.toRequestBody(JSON))
+            .build()
+        runCatching {
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use false
+                val raw = response.body?.string().orEmpty()
+                val json = runCatching { JSONObject(raw) }.getOrNull()
+                json?.optString("token")?.isNotBlank() == true
+            }
+        }.getOrDefault(false)
+    }
+
+    suspend fun ensureSession(): Boolean = hasSession() || restoreSession()
+
     suspend fun presign(
         chunkId: String,
         sessionId: String,
@@ -91,6 +111,7 @@ class ApiClient(context: Context) {
         durationMs: Long?,
         capturedAtMs: Long?,
     ): ApiResult<PresignedUpload> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val payload = JSONObject()
             .put("chunkId", chunkId)
             .put("sessionId", sessionId)
@@ -168,6 +189,7 @@ class ApiClient(context: Context) {
     }
 
     suspend fun complete(uploadSessionId: String, chunkId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val payload = JSONObject().put("uploadSessionId", uploadSessionId).put("chunkId", chunkId).toString()
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/uploads/audio-chunks/complete")
@@ -190,6 +212,7 @@ class ApiClient(context: Context) {
     }
 
     suspend fun status(sessionIds: List<String>): ApiResult<List<SessionProgress>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val payload = JSONObject().put("sessionIds", JSONArray(sessionIds)).toString()
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/audio-sessions/status")
