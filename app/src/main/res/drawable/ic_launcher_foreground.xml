@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Page shadow -->
+    <path
+        android:pathData="M40,26h38a8,8 0 0 1 8,8v46a8,8 0 0 1 -8,8h-38a8,8 0 0 1 -8,-8v-46a8,8 0 0 1 8,-8z"
+        android:fillColor="#050816"
+        android:fillAlpha="0.38" />
+
+    <!-- Document page -->
+    <path
+        android:pathData="M36,22h38a8,8 0 0 1 8,8v46a8,8 0 0 1 -8,8h-38a8,8 0 0 1 -8,-8v-46a8,8 0 0 1 8,-8z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Folded corner -->
+    <path
+        android:pathData="M64,22h10a8,8 0 0 1 8,8v10z"
+        android:fillColor="#C7D2FE" />
+
+    <!-- Text lines -->
+    <path
+        android:pathData="M38,40h24"
+        android:strokeColor="#94A3B8"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M38,48h18"
+        android:strokeColor="#CBD5E1"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M38,56h21"
+        android:strokeColor="#CBD5E1"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round" />
+
+    <!-- Audio waveform: the conspect is sound turned into notes -->
+    <path
+        android:pathData="M60,66v12"
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M67,60v22"
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M74,56v28"
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M81,63v18"
+        android:strokeColor="#FCD34D"
+        android:strokeWidth="4"
+        android:strokeLineCap="round" />
+</vector>

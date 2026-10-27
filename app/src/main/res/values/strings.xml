@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Лектор Рекордер</string>
+    <string name="app_name">QueryDoc</string>
     <string name="status_recording">Запись</string>
     <string name="status_idle">Ожидание</string>
     <string name="elapsed_label">Длительность: %1$s</string>
