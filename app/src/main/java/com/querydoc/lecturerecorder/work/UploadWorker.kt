@@ -18,7 +18,7 @@ class UploadWorker(
     override suspend fun doWork(): Result {
         Diagnostics.info(applicationContext, "UploadWorker: started")
         val dao = AppGraph.db(applicationContext).uploadQueueDao()
-        val repository = AppGraph.uploadRepository()
+        val repository = AppGraph.uploadRepository(applicationContext)
 
         while (true) {
             val item = dao.nextPending() ?: return Result.success()
@@ -26,7 +26,7 @@ class UploadWorker(
             dao.updateStatus(item.id, UploadStatus.UPLOADING, item.retryCount, now)
 
             val file = File(item.filePath)
-            val result = repository.upload(file, item.mediaType, item.mimeType)
+            val result = repository.upload(item)
             when (result) {
                 UploadResult.Success -> {
                     val updateTs = System.currentTimeMillis()
@@ -41,6 +41,12 @@ class UploadWorker(
                     dao.updateStatus(item.id, UploadStatus.FAILED, item.retryCount + 1, System.currentTimeMillis())
                     Diagnostics.warn(applicationContext, "UploadWorker: retryable failure ${item.displayName}")
                     return Result.retry()
+                }
+
+                UploadResult.AuthRequired -> {
+                    dao.updateStatus(item.id, UploadStatus.FAILED, item.retryCount + 1, System.currentTimeMillis())
+                    Diagnostics.warn(applicationContext, "UploadWorker: authorization required")
+                    return Result.failure()
                 }
 
                 is UploadResult.PermanentFailure -> {

@@ -1,5 +1,7 @@
 package com.querydoc.lecturerecorder.recording
 
+import android.annotation.SuppressLint
+
 import android.Manifest
 import android.app.Application
 import android.content.pm.PackageManager
@@ -40,6 +42,7 @@ class IdleMicLevelMonitor(
         environmentProfile = profile
     }
 
+    @SuppressLint("MissingPermission") // RECORD_AUDIO is granted before this monitor starts.
     fun start() {
         if (isRunning) return
         if (!hasMicPermission()) return

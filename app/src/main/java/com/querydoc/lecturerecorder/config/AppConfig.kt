@@ -1,6 +1,10 @@
 package com.querydoc.lecturerecorder.config
 
 object AppConfig {
+    object Api {
+        val baseUrl: String = com.querydoc.lecturerecorder.BuildConfig.API_BASE_URL.trimEnd('/')
+    }
+
     object Audio {
         const val chunkDurationSec: Long = 30L
         const val sampleRateHz: Int = 24_000

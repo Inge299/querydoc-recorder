@@ -3,7 +3,8 @@ package com.querydoc.lecturerecorder
 import android.content.Context
 import androidx.room.Room
 import com.querydoc.lecturerecorder.data.local.AppDatabase
-import com.querydoc.lecturerecorder.data.repository.StubUploadRepository
+import com.querydoc.lecturerecorder.data.remote.ApiClient
+import com.querydoc.lecturerecorder.data.repository.QueryDocUploadRepository
 import com.querydoc.lecturerecorder.data.repository.UploadRepository
 import com.querydoc.lecturerecorder.photo.HeuristicRectangleDetector
 import com.querydoc.lecturerecorder.photo.PhotoCropper
@@ -15,6 +16,8 @@ object AppGraph {
 
     @Volatile
     private var uploadRepositoryInstance: UploadRepository? = null
+    @Volatile
+    private var apiClientInstance: ApiClient? = null
     @Volatile
     private var photoCropperInstance: PhotoCropper? = null
     @Volatile
@@ -30,9 +33,15 @@ object AppGraph {
         }
     }
 
-    fun uploadRepository(): UploadRepository {
+    fun apiClient(context: Context): ApiClient {
+        return apiClientInstance ?: synchronized(this) {
+            apiClientInstance ?: ApiClient(context.applicationContext).also { apiClientInstance = it }
+        }
+    }
+
+    fun uploadRepository(context: Context): UploadRepository {
         return uploadRepositoryInstance ?: synchronized(this) {
-            uploadRepositoryInstance ?: StubUploadRepository().also { uploadRepositoryInstance = it }
+            uploadRepositoryInstance ?: QueryDocUploadRepository(apiClient(context)).also { uploadRepositoryInstance = it }
         }
     }
 

@@ -73,7 +73,7 @@ fun RecorderScreen(
     onToggleFarLecturerMode: () -> Unit,
     onSetPauseOnInterruptions: (Boolean) -> Unit,
     onSetEnvironmentProfile: (EnvironmentProfile) -> Unit,
-    onAuthorizationRequested: () -> Unit,
+    onLogout: () -> Unit,
     onPauseOrResumeRecording: () -> Unit,
     onStopRecording: () -> Unit,
     onPlayRecording: (String, Float?) -> Unit,
@@ -307,10 +307,10 @@ fun RecorderScreen(
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Авторизация (скоро)", style = MaterialTheme.typography.bodySmall) },
+                                text = { Text("Выйти из аккаунта", style = MaterialTheme.typography.bodySmall) },
                                 onClick = {
                                     settingsExpanded = false
-                                    onAuthorizationRequested()
+                                    onLogout()
                                 }
                             )
                         }

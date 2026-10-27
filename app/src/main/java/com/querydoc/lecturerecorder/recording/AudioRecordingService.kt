@@ -14,6 +14,7 @@ import com.querydoc.lecturerecorder.data.local.MediaType
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
+import com.querydoc.lecturerecorder.work.UploadScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -233,10 +234,11 @@ class AudioRecordingService : Service() {
                     updatedAtMs = now,
                     uploadedAtMs = null,
                     deleteAfterMs = deleteAfter,
-                    metadataJson = "sessionId=$sessionId;chunkIndex=$chunkIndex"
+                    metadataJson = "sessionId=$sessionId;chunkIndex=$chunkIndex;chunkCount=0;capturedAtMs=$now;durationMs=" + (AppConfig.Audio.chunkDurationSec * 1000L)
                 )
             )
             Diagnostics.info(applicationContext, "AudioRecordingService: enqueued ${file.name}")
+            UploadScheduler.enqueue(applicationContext)
         }
     }
 

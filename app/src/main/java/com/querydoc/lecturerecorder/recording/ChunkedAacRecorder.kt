@@ -1,5 +1,7 @@
 package com.querydoc.lecturerecorder.recording
 
+import android.annotation.SuppressLint
+
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaCodec
@@ -84,6 +86,7 @@ class ChunkedAacRecorder(
         RecordingTelemetry.reset()
     }
 
+    @SuppressLint("MissingPermission") // RECORD_AUDIO is requested by MainActivity and checked before starting the service.
     private suspend fun runRecorderLoop() {
         outputDir.mkdirs()
         val sampleRate = AppConfig.Audio.sampleRateHz
