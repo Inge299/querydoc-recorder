@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -64,6 +66,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -505,14 +512,14 @@ fun RecorderScreen(
                         .heightIn(max = 420.dp)
                         .verticalScroll(rememberScrollState())
                 ) {
-                    Text(
-                        text = if (conspect.status == "completed") {
-                            conspect.markdown.ifBlank { "Конспект пуст." }
-                        } else {
-                            conspect.error.ifBlank { "Не удалось подготовить конспект." }
-                        },
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                    if (conspect.status == "completed") {
+                        ConspectMarkdown(conspect.markdown.ifBlank { "Конспект пуст." })
+                    } else {
+                        Text(
+                            text = conspect.error.ifBlank { "Не удалось подготовить конспект." },
+                            style = MaterialTheme.typography.bodyMedium,
+                        )
+                    }
                 }
             },
             confirmButton = {
@@ -661,6 +668,54 @@ private fun RecordingItemRow(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun ConspectMarkdown(markdown: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        markdown.lines().forEach { rawLine ->
+            val line = rawLine.trimEnd()
+            when {
+                line.startsWith("# ") -> Text(
+                    text = line.removePrefix("# ").trim(),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+                line.startsWith("## ") -> Text(
+                    text = line.removePrefix("## ").trim(),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                line.startsWith("- ") || line.startsWith("* ") -> Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text("•", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4338CA))
+                    Text(
+                        text = inlineBold(line.drop(2).trim()),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+                line.isBlank() -> Spacer(Modifier.height(4.dp))
+                else -> Text(
+                    text = inlineBold(line),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+    }
+}
+
+private fun inlineBold(text: String): AnnotatedString = buildAnnotatedString {
+    val parts = text.split("**")
+    parts.forEachIndexed { index, part ->
+        if (index % 2 == 1) {
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) }
+        } else {
+            append(part)
         }
     }
 }

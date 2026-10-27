@@ -1,6 +1,7 @@
 package com.querydoc.lecturerecorder
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val viewModel: RecorderViewModel by viewModels()
+    private val pendingConspectSessionId = mutableStateOf<String?>(null)
 
     private val permissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -38,6 +40,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        pendingConspectSessionId.value = intent?.getStringExtra(EXTRA_CONSPECT_SESSION_ID)
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
         setContent {
@@ -68,6 +71,13 @@ class MainActivity : ComponentActivity() {
                             ),
                         )
                     }
+                }
+            }
+            val requestedConspect = pendingConspectSessionId.value
+            LaunchedEffect(requestedConspect, introVisible, loggedIn) {
+                if (!introVisible && loggedIn && !requestedConspect.isNullOrBlank()) {
+                    pendingConspectSessionId.value = null
+                    viewModel.requestConspect(requestedConspect)
                 }
             }
             val screen = when {
@@ -111,9 +121,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingConspectSessionId.value = intent.getStringExtra(EXTRA_CONSPECT_SESSION_ID)
+    }
+
     private fun applyScreenBrightness(brightness: Float?) {
         val layoutParams = window.attributes
         layoutParams.screenBrightness = brightness ?: android.view.WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         window.attributes = layoutParams
+    }
+
+    companion object {
+        const val EXTRA_CONSPECT_SESSION_ID = "conspect_session_id"
     }
 }

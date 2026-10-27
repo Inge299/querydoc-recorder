@@ -6,6 +6,7 @@ import androidx.work.WorkerParameters
 import com.querydoc.lecturerecorder.AppGraph
 import com.querydoc.lecturerecorder.config.AppConfig
 import com.querydoc.lecturerecorder.data.local.UploadStatus
+import com.querydoc.lecturerecorder.data.repository.UploadMetadata
 import com.querydoc.lecturerecorder.data.repository.UploadResult
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
 import java.io.File
@@ -21,7 +22,7 @@ class UploadWorker(
         val repository = AppGraph.uploadRepository(applicationContext)
 
         while (true) {
-            val item = dao.nextPending() ?: return Result.success()
+            val item = dao.nextPending() ?: break
             val now = System.currentTimeMillis()
             dao.updateStatus(item.id, UploadStatus.UPLOADING, item.retryCount, now)
 
@@ -54,6 +55,28 @@ class UploadWorker(
                     Diagnostics.warn(applicationContext, "UploadWorker: permanent failure ${item.displayName}")
                 }
             }
+        }
+
+        scheduleCompletedSessions(dao)
+        return Result.success()
+    }
+
+    private suspend fun scheduleCompletedSessions(dao: com.querydoc.lecturerecorder.data.local.UploadQueueDao) {
+        runCatching {
+            val grouped = dao.allAudioItems()
+                .mapNotNull { item -> UploadMetadata.parse(item.metadataJson)?.let { meta -> meta to item } }
+                .groupBy { (meta, _) -> meta.sessionId }
+            grouped.forEach { (sessionId, entries) ->
+                val expectedChunks = entries.mapNotNull { (meta, _) -> meta.chunkCount }.maxOrNull()
+                val allUploaded = entries.all { (_, item) -> item.status == UploadStatus.UPLOADED }
+                val enoughChunks = expectedChunks == null || entries.size >= expectedChunks
+                if (allUploaded && enoughChunks) {
+                    Diagnostics.info(applicationContext, "UploadWorker: session complete, scheduling conspect $sessionId")
+                    ConspectScheduler.enqueue(applicationContext, sessionId)
+                }
+            }
+        }.onFailure { error ->
+            Diagnostics.warn(applicationContext, "UploadWorker: conspect scheduling failed ${error.message}")
         }
     }
 

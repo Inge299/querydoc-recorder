@@ -20,6 +20,9 @@ interface UploadQueueDao {
     @Query("SELECT * FROM upload_queue WHERE mediaType = 'CROPPED_PHOTO' ORDER BY createdAtMs DESC")
     fun observePhotoItems(): Flow<List<UploadQueueEntity>>
 
+    @Query("SELECT * FROM upload_queue WHERE mediaType = 'AUDIO_CHUNK' ORDER BY createdAtMs ASC")
+    suspend fun allAudioItems(): List<UploadQueueEntity>
+
     @Query("SELECT * FROM upload_queue WHERE status IN ('PENDING', 'FAILED') ORDER BY createdAtMs ASC LIMIT 1")
     suspend fun nextPending(): UploadQueueEntity?
 
