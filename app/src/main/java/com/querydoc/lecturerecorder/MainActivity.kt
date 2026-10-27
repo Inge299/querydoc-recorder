@@ -75,6 +75,11 @@ class MainActivity : ComponentActivity() {
                 loggedIn -> "recorder"
                 else -> "login"
             }
+            LaunchedEffect(screen) {
+                val controller = WindowCompat.getInsetsController(window, window.decorView)
+                controller.isAppearanceLightStatusBars = screen != "intro"
+                controller.isAppearanceLightNavigationBars = false
+            }
             MaterialTheme {
                 Surface {
                     Crossfade(targetState = screen, animationSpec = tween(360), label = "querydoc-root") { target ->

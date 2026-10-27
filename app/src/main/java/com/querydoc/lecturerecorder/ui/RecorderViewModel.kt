@@ -221,9 +221,10 @@ class RecorderViewModel(
                 while (current != null && current.status != "completed" && current.status != "failed" && polls < 150) {
                     delay(4_000)
                     polls += 1
-                    when (val result = api.conspect(sessionId)) {
+                    when (val result = api.finalizeConspect(sessionId)) {
                         is ApiResult.Ok -> current = result.value
                         is ApiResult.Failure -> {
+                            // The aggregate may still be waiting for STT/indexing; retry finalize.
                             if (result.status != 404 && result.status != 202) {
                                 current = ConspectState(sessionId, "failed", "", result.message, 0)
                             }
