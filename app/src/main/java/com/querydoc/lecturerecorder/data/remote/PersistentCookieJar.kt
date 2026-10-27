@@ -31,11 +31,14 @@ class PersistentCookieJar(context: Context) : CookieJar {
         synchronized(this) {
             val now = System.currentTimeMillis()
             val entries = readEntries()
-            val valid = entries.filter { (host, cookie) ->
-                (host == url.host || cookie.matches(url)) && cookie.expiresAt > now
-            }
-            if (valid.size != entries.size) writeEntries(valid)
-            return valid.map { it.second }
+            // Only drop expired cookies. Filtering by the current host here
+            // would erase the QueryDoc session cookie when OkHttp uploads to
+            // the S3 host, because S3 cookies and API cookies share this jar.
+            val unexpired = entries.filter { (_, cookie) -> cookie.expiresAt > now }
+            if (unexpired.size != entries.size) writeEntries(unexpired)
+            return unexpired
+                .filter { (host, cookie) -> host == url.host || cookie.matches(url) }
+                .map { it.second }
         }
     }
 

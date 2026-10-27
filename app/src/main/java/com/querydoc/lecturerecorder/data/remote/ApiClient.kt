@@ -2,6 +2,7 @@ package com.querydoc.lecturerecorder.data.remote
 
 import android.content.Context
 import com.querydoc.lecturerecorder.config.AppConfig
+import com.querydoc.lecturerecorder.diagnostics.Diagnostics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -38,6 +39,7 @@ data class SessionProgress(
 )
 
 class ApiClient(context: Context) {
+    private val appContext = context.applicationContext
     private val baseUrl = AppConfig.Api.baseUrl
     private val cookieJar = PersistentCookieJar(context)
     private val client = OkHttpClient.Builder()
@@ -107,6 +109,7 @@ class ApiClient(context: Context) {
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (!response.isSuccessful || json == null) {
+                Diagnostics.warn(appContext, "presign failed status=${response.code} code=${json?.optString("code").orEmpty()}")
                 return@use ApiResult.Failure(
                     status = response.code,
                     code = json?.optString("code").orEmpty(),
@@ -157,7 +160,10 @@ class ApiClient(context: Context) {
         builder.method(upload.uploadMethod, file.asRequestBody(FILE_MEDIA_TYPE))
         client.newCall(builder.build()).execute().use { response ->
             if (response.isSuccessful) ApiResult.Ok(Unit)
-            else ApiResult.Failure(response.code, "s3_put_failed", "S3 отклонил загрузку (${response.code})", response.code >= 500)
+            else {
+                Diagnostics.warn(appContext, "s3 put failed status=${response.code}")
+                ApiResult.Failure(response.code, "s3_put_failed", "S3 отклонил загрузку (${response.code})", response.code >= 500)
+            }
         }
     }
 
@@ -171,12 +177,15 @@ class ApiClient(context: Context) {
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (response.isSuccessful && json?.optBoolean("accepted") != false) ApiResult.Ok(Unit)
-            else ApiResult.Failure(
-                status = response.code,
-                code = json?.optString("code").orEmpty(),
-                message = json?.optString("error").orEmpty().ifBlank { "Не удалось подтвердить загрузку" },
-                retryable = response.code >= 500 || response.code == 409,
-            )
+            else {
+                Diagnostics.warn(appContext, "complete failed status=${response.code} code=${json?.optString("code").orEmpty()}")
+                ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось подтвердить загрузку" },
+                    retryable = response.code >= 500 || response.code == 409,
+                )
+            }
         }
     }
 
@@ -190,6 +199,7 @@ class ApiClient(context: Context) {
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (!response.isSuccessful || json == null) {
+                Diagnostics.warn(appContext, "presign failed status=${response.code} code=${json?.optString("code").orEmpty()}")
                 return@use ApiResult.Failure(response.code, "", "Не удалось получить статус сессии", response.code >= 500)
             }
             val sessions = json.optJSONArray("sessions") ?: return@use ApiResult.Ok(emptyList())
