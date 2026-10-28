@@ -18,6 +18,7 @@ import com.querydoc.lecturerecorder.recording.AudioRecordingService
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 import com.querydoc.lecturerecorder.recording.IdleMicLevelMonitor
 import com.querydoc.lecturerecorder.recording.RecordingTelemetry
+import com.querydoc.lecturerecorder.work.ConspectCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -202,17 +203,27 @@ class RecorderViewModel(
 
     fun requestConspect(sessionId: String) {
         if (!conspectJobs.add(sessionId)) return
-        _state.update { it.copy(statusText = "Готовим конспект…", conspectDialog = null) }
+        val cached = ConspectCache.get(app, sessionId)
+        _state.update {
+            it.copy(
+                statusText = if (cached != null) "Конспект готов" else "Готовим конспект…",
+                conspectDialog = cached?.let { ConspectState(sessionId, "completed", it, "", 0) },
+            )
+        }
         viewModelScope.launch {
             try {
                 var current: ConspectState? = when (val result = api.finalizeConspect(sessionId)) {
                     is ApiResult.Ok -> result.value
                     is ApiResult.Failure -> {
-                        _state.update {
-                            it.copy(
-                                statusText = "Не удалось запустить конспект",
-                                conspectDialog = ConspectState(sessionId, "failed", "", result.message, 0),
-                            )
+                        if (cached != null && result.status == 0) {
+                            _state.update { it.copy(statusText = "Нет сети — показан сохранённый конспект") }
+                        } else {
+                            _state.update {
+                                it.copy(
+                                    statusText = "Не удалось открыть конспект",
+                                    conspectDialog = ConspectState(sessionId, "failed", "", result.message, 0),
+                                )
+                            }
                         }
                         return@launch
                     }
@@ -224,6 +235,10 @@ class RecorderViewModel(
                     when (val result = api.finalizeConspect(sessionId)) {
                         is ApiResult.Ok -> current = result.value
                         is ApiResult.Failure -> {
+                            if (result.status == 0 && cached != null) {
+                                _state.update { it.copy(statusText = "Нет сети — показан сохранённый конспект") }
+                                return@launch
+                            }
                             // The aggregate may still be waiting for STT/indexing; retry finalize.
                             if (result.status != 404 && result.status != 202) {
                                 current = ConspectState(sessionId, "failed", "", result.message, 0)
@@ -233,6 +248,7 @@ class RecorderViewModel(
                 }
                 val finalState = current
                 if (finalState != null && finalState.status == "completed") {
+                    ConspectCache.save(app, sessionId, finalState.markdown)
                     _state.update { it.copy(statusText = "Конспект готов", conspectDialog = finalState) }
                 } else if (finalState != null && finalState.status == "failed") {
                     _state.update { it.copy(statusText = "Конспект не готов", conspectDialog = finalState) }

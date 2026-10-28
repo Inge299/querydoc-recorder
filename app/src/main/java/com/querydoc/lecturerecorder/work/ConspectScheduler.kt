@@ -22,6 +22,32 @@ object ConspectScheduler {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean("done_$sessionId", true).apply()
     }
 
+    fun markUnseen(context: Context, sessionId: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putBoolean("unseen_$sessionId", true)
+            .putLong("unseen_at_$sessionId", System.currentTimeMillis())
+            .apply()
+    }
+
+    /** Returns the newest unread conspect and clears the unread flags. */
+    fun consumeLatestUnseen(context: Context): String? {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val candidates = prefs.all
+            .filterKeys { it.startsWith("unseen_") && it != "unseen_at_" }
+            .filterValues { it == true }
+            .keys
+            .map { key -> key.removePrefix("unseen_") }
+        if (candidates.isEmpty()) return null
+        val latest = candidates.maxByOrNull { prefs.getLong("unseen_at_$it", 0L) }
+        val editor = prefs.edit()
+        candidates.forEach { sessionId ->
+            editor.remove("unseen_$sessionId")
+            editor.remove("unseen_at_$sessionId")
+        }
+        editor.apply()
+        return latest
+    }
+
     fun enqueue(context: Context, sessionId: String) {
         if (isCompleted(context, sessionId)) return
         if (sessionId.isBlank()) return

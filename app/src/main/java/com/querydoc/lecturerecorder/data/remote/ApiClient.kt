@@ -10,6 +10,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -57,6 +58,16 @@ class ApiClient(context: Context) {
         .writeTimeout(60, TimeUnit.SECONDS)
         .build()
 
+    private fun execute(request: Request): Response? = try {
+        client.newCall(request).execute()
+    } catch (error: Exception) {
+        Diagnostics.warn(appContext, "network error: ${error.message}")
+        null
+    }
+
+    private fun networkFailure(): ApiResult.Failure =
+        ApiResult.Failure(0, "network_error", "Нет подключения к интернету", true)
+
     fun hasSession(): Boolean = cookieJar.hasSessionCookie()
 
     suspend fun login(phone: String, password: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
@@ -65,7 +76,8 @@ class ApiClient(context: Context) {
             .url("$baseUrl/api/auth/login")
             .post(body.toRequestBody(JSON))
             .build()
-        client.newCall(request).execute().use { response ->
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (response.isSuccessful && json?.optBoolean("success") == true) {
@@ -134,7 +146,8 @@ class ApiClient(context: Context) {
             .url("$baseUrl/api/v1/mobile/uploads/audio-chunks/presign")
             .post(payload.toString().toRequestBody(JSON))
             .build()
-        client.newCall(request).execute().use { response ->
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (!response.isSuccessful || json == null) {
@@ -187,7 +200,9 @@ class ApiClient(context: Context) {
         val builder = Request.Builder().url(upload.uploadUrl)
         upload.uploadHeaders.forEach { (key, value) -> builder.header(key, value) }
         builder.method(upload.uploadMethod, file.asRequestBody(FILE_MEDIA_TYPE))
-        client.newCall(builder.build()).execute().use { response ->
+        val request = builder.build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
             if (response.isSuccessful) ApiResult.Ok(Unit)
             else {
                 Diagnostics.warn(appContext, "s3 put failed status=${response.code}")
@@ -203,7 +218,8 @@ class ApiClient(context: Context) {
             .url("$baseUrl/api/v1/mobile/uploads/audio-chunks/complete")
             .post(payload.toRequestBody(JSON))
             .build()
-        client.newCall(request).execute().use { response ->
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (response.isSuccessful && json?.optBoolean("accepted") != false) ApiResult.Ok(Unit)
@@ -226,7 +242,8 @@ class ApiClient(context: Context) {
             .url("$baseUrl/api/v1/mobile/audio-sessions/status")
             .post(payload.toRequestBody(JSON))
             .build()
-        client.newCall(request).execute().use { response ->
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (!response.isSuccessful || json == null) {
@@ -256,7 +273,8 @@ class ApiClient(context: Context) {
             .url("$baseUrl/api/v1/mobile/audio-sessions/finalize")
             .post(payload.toRequestBody(JSON))
             .build()
-        client.newCall(request).execute().use { response ->
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (response.code == 202 && json?.optBoolean("accepted") == false) {
@@ -290,7 +308,8 @@ class ApiClient(context: Context) {
             .url("$baseUrl/api/v1/mobile/audio-sessions/conspect")
             .post(payload.toRequestBody(JSON))
             .build()
-        client.newCall(request).execute().use { response ->
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             val item = json?.optJSONObject("conspect")

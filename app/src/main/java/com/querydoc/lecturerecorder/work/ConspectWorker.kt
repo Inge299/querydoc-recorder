@@ -40,6 +40,8 @@ class ConspectWorker(
                     val state = result.value
                     if (state.status == "completed") {
                         ConspectScheduler.markCompleted(applicationContext, sessionId)
+                        ConspectCache.save(applicationContext, sessionId, state.markdown)
+                        ConspectScheduler.markUnseen(applicationContext, sessionId)
                         notifyCompleted(sessionId, state.markdown)
                         Diagnostics.info(applicationContext, "ConspectWorker: completed $sessionId")
                         return Result.success()
@@ -76,11 +78,18 @@ class ConspectWorker(
         notify(
             sessionId = sessionId,
             title = "Конспект готов",
-            text = text.lineSequence().firstOrNull { it.isNotBlank() }?.take(160) ?: "Конспект готов",
+            text = notificationPreview(text),
             bigText = text.take(4_000),
             id = 1000 + (sessionId.hashCode() and 0x7fff),
         )
     }
+
+    private fun notificationPreview(markdown: String): String =
+        markdown.lineSequence()
+            .map { it.trim() }
+            .firstOrNull { it.isNotBlank() && !it.startsWith("#") }
+            ?.take(160)
+            ?: "Откройте, чтобы прочитать конспект"
 
     private fun notifyFailed(sessionId: String, error: String) {
         notify(

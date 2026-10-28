@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.ui.IntroScreen
@@ -24,6 +25,7 @@ import com.querydoc.lecturerecorder.ui.LoginScreen
 import com.querydoc.lecturerecorder.ui.RecorderScreen
 import com.querydoc.lecturerecorder.ui.RecorderViewModel
 import com.querydoc.lecturerecorder.work.CleanupScheduler
+import com.querydoc.lecturerecorder.work.ConspectScheduler
 import com.querydoc.lecturerecorder.work.UploadScheduler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -60,6 +62,13 @@ class MainActivity : ComponentActivity() {
                     if (!loggedIn && api.restoreSession()) loggedIn = true
                 }
                 if (!introVisible && loggedIn) {
+                    if (!viewModel.state.value.isRecording) {
+                        NotificationManagerCompat.from(applicationContext).cancelAll()
+                    }
+                    if (pendingConspectSessionId.value.isNullOrBlank()) {
+                        val latestConspect = ConspectScheduler.consumeLatestUnseen(applicationContext)
+                        if (latestConspect != null) pendingConspectSessionId.value = latestConspect
+                    }
                     UploadScheduler.enqueue(applicationContext)
                     CleanupScheduler.enqueue(applicationContext)
                     if (!permissionsRequested) {
