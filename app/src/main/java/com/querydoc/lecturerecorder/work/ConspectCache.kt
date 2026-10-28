@@ -17,6 +17,15 @@ object ConspectCache {
             .apply()
     }
 
+    fun remove(context: Context, sessionId: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .remove("markdown_$sessionId")
+            .remove("saved_at_$sessionId")
+            .remove("transcript_$sessionId")
+            .apply()
+    }
+
     fun get(context: Context, sessionId: String): String? =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .getString("markdown_$sessionId", null)
@@ -51,6 +60,7 @@ object ConspectCache {
                 ConspectSummary(
                     sessionId = sessionId,
                     title = title,
+                    subject = "",
                     preview = preview,
                     completedAt = if (savedAt > 0L) Instant.ofEpochMilli(savedAt).toString() else "",
                     length = markdown.length,

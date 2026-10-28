@@ -27,6 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
@@ -199,7 +201,13 @@ fun RecorderScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "T ${formatDuration(uiState.elapsedSeconds)} • ARU x${"%.2f".format(uiState.agcGain)} • Q ${uiState.pendingUploads}",
+                            text = buildString {
+                                append(formatDuration(uiState.elapsedSeconds))
+                                if (uiState.pendingUploads > 0) {
+                                    append("  ·  загрузка: ")
+                                    append(uiState.pendingUploads)
+                                }
+                            },
                             color = Color(0xFFDDEAFD),
                             style = MaterialTheme.typography.labelSmall,
                             maxLines = 1,
@@ -208,14 +216,14 @@ fun RecorderScreen(
                     }
                     Box {
                         IconButton(
-                            modifier = Modifier.size(24.dp),
+                            modifier = Modifier.size(32.dp),
                             onClick = { settingsExpanded = true }
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
                                 contentDescription = "Настройки",
                                 tint = Color(0xFFDDEAFD),
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(18.dp)
                             )
                         }
                         DropdownMenu(
@@ -347,14 +355,24 @@ fun RecorderScreen(
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 val meterColor = levelColor(uiState.soundLevel)
-                Text(
-                    text = "Микр. пик ${(uiState.soundLevel * 100).toInt()}% • ср ${(uiState.averageSoundLevel * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "Уровень микрофона",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF475569),
+                    )
+                    Text(
+                        text = levelWord(uiState.soundLevel),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = meterColor,
+                    )
+                }
                 LevelBar(
-                    label = "Уровень",
+                    label = "",
                     level = uiState.soundLevel,
                     average = uiState.averageSoundLevel,
                     color = meterColor
@@ -366,33 +384,77 @@ fun RecorderScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 2.dp),
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(onClick = onStartRecording, enabled = !uiState.isRecording) {
-                    Icon(
-                        imageVector = Icons.Filled.FiberManualRecord,
-                        contentDescription = "Запись",
-                        tint = if (uiState.isRecording) Color(0xFF94A3B8) else Color(0xFFEF4444),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                IconButton(onClick = onPauseOrResumeRecording, enabled = uiState.isRecording) {
-                    Icon(
-                        imageVector = if (uiState.isRecordingPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
-                        contentDescription = if (uiState.isRecordingPaused) "Продолжить" else "Пауза",
-                        tint = if (uiState.isRecording) Color(0xFF0F172A) else Color(0xFF94A3B8),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-                IconButton(onClick = onStopRecording, enabled = uiState.isRecording) {
-                    Icon(
-                        imageVector = Icons.Filled.Stop,
-                        contentDescription = "Стоп",
-                        tint = if (uiState.isRecording) Color(0xFF0F172A) else Color(0xFF94A3B8),
-                        modifier = Modifier.size(22.dp)
-                    )
+                ControlButton(
+                    icon = Icons.Filled.FiberManualRecord,
+                    label = "Запись",
+                    enabled = !uiState.isRecording,
+                    accent = Color(0xFFEF4444),
+                    primary = true,
+                    onClick = onStartRecording,
+                )
+                ControlButton(
+                    icon = if (uiState.isRecordingPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                    label = if (uiState.isRecordingPaused) "Продолжить" else "Пауза",
+                    enabled = uiState.isRecording,
+                    accent = Color(0xFF334155),
+                    onClick = onPauseOrResumeRecording,
+                )
+                ControlButton(
+                    icon = Icons.Filled.Stop,
+                    label = "Стоп",
+                    enabled = uiState.isRecording,
+                    accent = Color(0xFF334155),
+                    onClick = onStopRecording,
+                )
+            }
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenConspects),
+            shape = sectionShape,
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        ) {
+            Box(
+                modifier = Modifier.background(
+                    Brush.linearGradient(listOf(Color(0xFFEEF2FF), Color(0xFFE0E7FF))),
+                ),
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .background(
+                                Brush.linearGradient(listOf(Color(0xFF4338CA), Color(0xFF7C6AE8))),
+                                RoundedCornerShape(12.dp),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(21.dp))
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Конспекты",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color(0xFF1E1B4B),
+                        )
+                        Text(
+                            text = "Готовые лекции в одном месте",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF64748B),
+                        )
+                    }
+                    Icon(Icons.Filled.ChevronRight, contentDescription = "Открыть конспекты", tint = Color(0xFF4338CA))
                 }
             }
         }
@@ -410,21 +472,6 @@ fun RecorderScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = "История", style = MaterialTheme.typography.bodySmall)
-                    if (!selectionMode) {
-                        TextButton(
-                            onClick = onOpenConspects,
-                            contentPadding = PaddingValues(horizontal = 6.dp),
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.MenuBook,
-                                contentDescription = null,
-                                tint = Color(0xFF4338CA),
-                                modifier = Modifier.size(16.dp),
-                            )
-                            Spacer(Modifier.size(4.dp))
-                            Text("Конспекты", style = MaterialTheme.typography.labelMedium)
-                        }
-                    }
                     if (selectionMode) {
                         Row(
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -687,6 +734,53 @@ private fun RecordingItemRow(
                 }
             }
         }
+    }
+}
+
+private fun levelWord(level: Float): String = when {
+    level < 0.02f -> "Тишина"
+    level < 0.2f -> "Тихо"
+    level < 0.75f -> "Хороший уровень"
+    else -> "Громко"
+}
+
+@Composable
+private fun ControlButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    label: String,
+    enabled: Boolean,
+    accent: Color,
+    primary: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val diameter = if (primary) 58.dp else 48.dp
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        IconButton(
+            onClick = onClick,
+            enabled = enabled,
+            modifier = Modifier
+                .size(diameter)
+                .background(
+                    if (enabled) accent.copy(alpha = if (primary) 0.14f else 0.08f) else Color(0xFFE2E8F0),
+                    CircleShape,
+                ),
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (!enabled) Color(0xFF94A3B8) else if (primary) accent else accent,
+                modifier = Modifier.size(if (primary) 28.dp else 22.dp),
+            )
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = if (enabled) Color(0xFF334155) else Color(0xFF94A3B8),
+            maxLines = 1,
+        )
     }
 }
 

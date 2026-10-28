@@ -41,6 +41,7 @@ data class ConspectState(
 data class ConspectSummary(
     val sessionId: String,
     val title: String,
+    val subject: String = "",
     val preview: String,
     val completedAt: String,
     val length: Int,
@@ -365,12 +366,36 @@ class ApiClient(context: Context) {
                 ConspectSummary(
                     sessionId = item.optString("sessionId"),
                     title = item.optString("title").ifBlank { "Конспект лекции" },
+                    subject = item.optString("subject"),
                     preview = item.optString("preview"),
                     completedAt = item.optString("completedAt"),
                     length = item.optInt("length"),
                 )
             }
             ApiResult.Ok(values)
+        }
+    }
+
+    suspend fun deleteConspect(sessionId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("sessionId", sessionId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/conspects")
+            .delete(payload.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось удалить конспект" },
+                    retryable = response.code >= 500,
+                )
+            }
+            ApiResult.Ok(Unit)
         }
     }
 

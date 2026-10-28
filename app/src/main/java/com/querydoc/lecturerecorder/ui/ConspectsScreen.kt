@@ -22,13 +22,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -40,6 +45,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +53,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import android.widget.Toast
+import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -71,16 +79,22 @@ fun ConspectsScreen(
     var offline by remember { mutableStateOf(false) }
     var items by remember { mutableStateOf<List<ConspectSummary>>(emptyList()) }
     var reload by remember { mutableIntStateOf(0) }
+    var deleteTarget by remember { mutableStateOf<ConspectSummary?>(null) }
+    var deleting by remember { mutableStateOf(false) }
+    var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(reload) {
         loading = true
         when (val result = api.listConspects()) {
             is ApiResult.Ok -> {
                 items = result.value
+                cachedIds = ConspectCache.list(context).map { it.sessionId }.toSet()
                 offline = false
             }
             is ApiResult.Failure -> {
                 items = ConspectCache.list(context)
+                cachedIds = items.map { it.sessionId }.toSet()
                 offline = true
             }
         }
@@ -183,10 +197,55 @@ fun ConspectsScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 items(items, key = { it.sessionId }) { item ->
-                    ConspectRow(item = item, onClick = { onOpen(item) })
+                    ConspectRow(
+                        item = item,
+                        hasLocalCopy = item.sessionId in cachedIds,
+                        onClick = { onOpen(item) },
+                        onRemoveLocal = {
+                            ConspectCache.remove(context, item.sessionId)
+                            cachedIds = cachedIds - item.sessionId
+                            if (offline) items = items.filterNot { it.sessionId == item.sessionId }
+                            Toast.makeText(context, "Копия удалена с устройства", Toast.LENGTH_SHORT).show()
+                        },
+                        onDeleteRemote = { deleteTarget = item },
+                    )
                 }
             }
         }
+    }
+
+    deleteTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { if (!deleting) deleteTarget = null },
+            title = { Text("Удалить конспект?") },
+            text = { Text("Конспект будет удалён с сервера и с устройства. Аудиозапись останется.") },
+            confirmButton = {
+                TextButton(
+                    enabled = !deleting,
+                    onClick = {
+                        deleting = true
+                        scope.launch {
+                            when (val result = api.deleteConspect(target.sessionId)) {
+                                is ApiResult.Ok -> {
+                                    ConspectCache.remove(context, target.sessionId)
+                                    items = items.filterNot { it.sessionId == target.sessionId }
+                                    cachedIds = cachedIds - target.sessionId
+                                    deleteTarget = null
+                                    Toast.makeText(context, "Конспект удалён", Toast.LENGTH_SHORT).show()
+                                }
+                                is ApiResult.Failure -> {
+                                    Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                                }
+                            }
+                            deleting = false
+                        }
+                    },
+                ) { Text(if (deleting) "Удаляем…" else "Удалить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { if (!deleting) deleteTarget = null }) { Text("Отмена") }
+            },
+        )
     }
 }
 
@@ -207,7 +266,14 @@ private fun formatConspectDate(value: String): String {
 }
 
 @Composable
-private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
+private fun ConspectRow(
+    item: ConspectSummary,
+    hasLocalCopy: Boolean,
+    onClick: () -> Unit,
+    onRemoveLocal: () -> Unit,
+    onDeleteRemote: () -> Unit,
+) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -241,6 +307,7 @@ private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
                         color = Color(0xFF6D5AE6),
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.8.sp,
+                        maxLines = 1,
                     )
                     Spacer(Modifier.weight(1f))
                     if (item.completedAt.isNotBlank()) {
@@ -250,6 +317,43 @@ private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
                             color = Color(0xFF94A3B8),
                         )
                     }
+                    Box {
+                        IconButton(
+                            modifier = Modifier.size(26.dp),
+                            onClick = { menuExpanded = true },
+                        ) {
+                            Icon(Icons.Filled.MoreVert, contentDescription = "Действия", tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            if (hasLocalCopy) {
+                                DropdownMenuItem(
+                                    text = { Text("Убрать с устройства") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onRemoveLocal()
+                                    },
+                                )
+                            }
+                            DropdownMenuItem(
+                                text = { Text("Удалить конспект", color = Color(0xFFDC2626)) },
+                                leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = Color(0xFFDC2626)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onDeleteRemote()
+                                },
+                            )
+                        }
+                    }
+                }
+                if (item.subject.isNotBlank()) {
+                    Text(
+                        text = item.subject.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF7C6AE8),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
                 }
                 Text(
                     text = displayTitle(item.title),
@@ -271,30 +375,25 @@ private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
                     )
                 }
                 Row(
-                    modifier = Modifier.padding(top = 8.dp),
+                    modifier = Modifier.padding(top = 8.dp).fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    val sizeLabel = if (item.length >= 1000) "${item.length / 1000} тыс. знаков" else "${item.length} знаков"
                     Text(
-                        text = "Читать конспект",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = Color(0xFF4338CA),
-                        fontWeight = FontWeight.SemiBold,
+                        text = "$sizeLabel · ≈ ${readingMinutes(item.length)} мин чтения",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF64748B),
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
                     )
-                    Spacer(Modifier.width(2.dp))
-                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFF4338CA), modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.weight(1f))
-                    if (item.length > 0) {
-                        Text(
-                            text = if (item.length >= 1000) "${item.length / 1000} тыс. знаков" else "${item.length} знаков",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(0xFF94A3B8),
-                        )
-                    }
+                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
                 }
             }
         }
     }
 }
+
+private fun readingMinutes(length: Int): Int = ((length + 999) / 1000).coerceAtLeast(1)
 
 private fun displayTitle(raw: String): String {
     val title = raw.trim()
