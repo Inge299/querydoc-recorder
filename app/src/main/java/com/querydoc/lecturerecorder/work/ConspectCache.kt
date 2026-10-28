@@ -22,6 +22,19 @@ object ConspectCache {
             .getString("markdown_$sessionId", null)
             ?.takeIf { it.isNotBlank() }
 
+    fun saveTranscript(context: Context, sessionId: String, transcript: String) {
+        if (sessionId.isBlank() || transcript.isBlank()) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .edit()
+            .putString("transcript_$sessionId", transcript)
+            .apply()
+    }
+
+    fun getTranscript(context: Context, sessionId: String): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString("transcript_$sessionId", null)
+            ?.takeIf { it.isNotBlank() }
+
     fun list(context: Context): List<ConspectSummary> {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return prefs.all.keys

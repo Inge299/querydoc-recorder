@@ -47,6 +47,13 @@ data class ConspectSummary(
     val markdown: String? = null,
 )
 
+data class TranscriptState(
+    val sessionId: String,
+    val title: String,
+    val transcript: String,
+    val turns: List<String>,
+)
+
 data class SessionProgress(
     val sessionId: String,
     val uploadedChunks: Int,
@@ -364,6 +371,39 @@ class ApiClient(context: Context) {
                 )
             }
             ApiResult.Ok(values)
+        }
+    }
+
+    suspend fun transcript(sessionId: String): ApiResult<TranscriptState> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val encoded = java.net.URLEncoder.encode(sessionId, "UTF-8")
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/transcript?sessionId=$encoded")
+            .get()
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось получить транскрипт" },
+                    retryable = response.code >= 500,
+                )
+            }
+            val turns = json.optJSONArray("turns")?.let { array ->
+                (0 until array.length()).mapNotNull { index -> array.optJSONObject(index)?.optString("text") }
+            }.orEmpty()
+            ApiResult.Ok(
+                TranscriptState(
+                    sessionId = json.optString("sessionId"),
+                    title = json.optString("title"),
+                    transcript = json.optString("transcript"),
+                    turns = turns,
+                ),
+            )
         }
     }
 
