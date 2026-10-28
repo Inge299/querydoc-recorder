@@ -10,6 +10,7 @@ data class RecorderUiState(
     val farLecturerMode: Boolean = true,
     val pauseOnInterruptions: Boolean = true,
     val environmentProfile: EnvironmentProfile = EnvironmentProfile.NORMAL,
+    val recognitionLanguage: RecognitionLanguage = RecognitionLanguage.RU,
     val energySaverEnabled: Boolean = true,
     val elapsedSeconds: Long = 0L,
     val remainingRecordSeconds: Long = 0L,

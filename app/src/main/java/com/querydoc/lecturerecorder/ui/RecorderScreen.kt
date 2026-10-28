@@ -92,6 +92,7 @@ fun RecorderScreen(
     onToggleFarLecturerMode: () -> Unit,
     onSetPauseOnInterruptions: (Boolean) -> Unit,
     onSetEnvironmentProfile: (EnvironmentProfile) -> Unit,
+    onSetRecognitionLanguage: (RecognitionLanguage) -> Unit,
     onLogout: () -> Unit,
     onPauseOrResumeRecording: () -> Unit,
     onStopRecording: () -> Unit,
@@ -336,6 +337,25 @@ fun RecorderScreen(
                                     onSetEnvironmentProfile(EnvironmentProfile.NOISY)
                                 }
                             )
+                            DropdownMenuItem(
+                                text = { Text("Язык распознавания", style = MaterialTheme.typography.bodySmall, color = Color(0xFF4338CA)) },
+                                onClick = {}
+                            )
+                            RecognitionLanguage.entries.forEach { language ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            (if (uiState.recognitionLanguage == language) "✓ " else "") + language.label,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            modifier = Modifier.padding(start = 16.dp)
+                                        )
+                                    },
+                                    onClick = {
+                                        settingsExpanded = false
+                                        onSetRecognitionLanguage(language)
+                                    }
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text("Выйти из аккаунта", style = MaterialTheme.typography.bodySmall) },
                                 onClick = {

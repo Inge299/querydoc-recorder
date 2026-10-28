@@ -147,6 +147,7 @@ class ApiClient(context: Context) {
         fileName: String,
         durationMs: Long?,
         capturedAtMs: Long?,
+        language: String?,
     ): ApiResult<PresignedUpload> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val payload = JSONObject()
@@ -159,6 +160,7 @@ class ApiClient(context: Context) {
         if (chunkCount != null && chunkCount > 0) payload.put("chunkCount", chunkCount)
         if (durationMs != null) payload.put("durationSec", durationMs / 1000.0)
         if (capturedAtMs != null) payload.put("capturedAt", java.time.Instant.ofEpochMilli(capturedAtMs).toString())
+        if (!language.isNullOrBlank()) payload.put("language", language)
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/uploads/audio-chunks/presign")
             .post(payload.toString().toRequestBody(JSON))

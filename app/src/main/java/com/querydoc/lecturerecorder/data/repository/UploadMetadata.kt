@@ -6,6 +6,7 @@ data class UploadMetadata(
     val chunkCount: Int?,
     val capturedAtMs: Long?,
     val durationMs: Long?,
+    val language: String? = null,
 ) {
     companion object {
         fun parse(raw: String?): UploadMetadata? {
@@ -25,6 +26,7 @@ data class UploadMetadata(
                 chunkCount = values["chunkCount"]?.toIntOrNull()?.takeIf { it > 0 },
                 capturedAtMs = values["capturedAtMs"]?.toLongOrNull(),
                 durationMs = values["durationMs"]?.toLongOrNull(),
+                language = values["language"]?.takeIf { it.isNotBlank() },
             )
         }
     }

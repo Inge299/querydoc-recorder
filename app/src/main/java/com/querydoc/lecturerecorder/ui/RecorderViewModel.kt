@@ -49,6 +49,9 @@ class RecorderViewModel(
     private val initialEnvironmentProfile = EnvironmentProfile.fromName(
         prefs.getString(KEY_ENVIRONMENT_PROFILE, EnvironmentProfile.NORMAL.name)
     )
+    private val initialRecognitionLanguage = RecognitionLanguage.fromName(
+        prefs.getString(KEY_RECOGNITION_LANGUAGE, RecognitionLanguage.RU.name)
+    )
 
     private val _state = MutableStateFlow(
         RecorderUiState(
@@ -56,6 +59,7 @@ class RecorderViewModel(
             farLecturerMode = initialFarLecturerMode,
             pauseOnInterruptions = initialPauseOnInterruptions,
             environmentProfile = initialEnvironmentProfile,
+            recognitionLanguage = initialRecognitionLanguage,
             energySaverEnabled = AppConfig.Power.enableEnergySaverByDefault,
             statusText = "Готово"
         )
@@ -114,6 +118,7 @@ class RecorderViewModel(
             putExtra(AudioRecordingService.EXTRA_FAR_LECTURER_MODE, state.value.farLecturerMode)
             putExtra(AudioRecordingService.EXTRA_ENVIRONMENT_PROFILE, state.value.environmentProfile.name)
             putExtra(AudioRecordingService.EXTRA_PAUSE_ON_INTERRUPTION, state.value.pauseOnInterruptions)
+            putExtra(AudioRecordingService.EXTRA_RECOGNITION_LANGUAGE, state.value.recognitionLanguage.code)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             app.startForegroundService(startIntent)
@@ -189,6 +194,11 @@ class RecorderViewModel(
     fun setPauseOnInterruptions(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_PAUSE_ON_INTERRUPTION, enabled).apply()
         _state.update { it.copy(pauseOnInterruptions = enabled) }
+    }
+
+    fun setRecognitionLanguage(language: RecognitionLanguage) {
+        prefs.edit().putString(KEY_RECOGNITION_LANGUAGE, language.name).apply()
+        _state.update { it.copy(recognitionLanguage = language) }
     }
 
     fun setEnvironmentProfile(profile: EnvironmentProfile) {
@@ -600,6 +610,7 @@ class RecorderViewModel(
         private const val PREFS_NAME = "recorder_preferences"
         private const val KEY_FAR_MODE = "far_mode"
         private const val KEY_PAUSE_ON_INTERRUPTION = "pause_on_interruption"
+        private const val KEY_RECOGNITION_LANGUAGE = "recognition_language"
         private const val KEY_ENVIRONMENT_PROFILE = "environment_profile"
     }
 

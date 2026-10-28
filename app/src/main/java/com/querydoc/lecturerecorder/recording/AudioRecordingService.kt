@@ -34,6 +34,7 @@ class AudioRecordingService : Service() {
     private var farLecturerMode = true
     private var pauseOnInterruption = true
     private var environmentProfile = EnvironmentProfile.NORMAL
+    private var recognitionLanguage = "ru-RU"
     private var sessionId: String = UUID.randomUUID().toString()
     private var chunkCounter: Int = 0
     private val pendingChunkInserts = AtomicInteger(0)
@@ -71,6 +72,7 @@ class AudioRecordingService : Service() {
             ACTION_START -> {
                 farLecturerMode = intent.getBooleanExtra(EXTRA_FAR_LECTURER_MODE, true)
                 pauseOnInterruption = intent.getBooleanExtra(EXTRA_PAUSE_ON_INTERRUPTION, true)
+                recognitionLanguage = intent.getStringExtra(EXTRA_RECOGNITION_LANGUAGE) ?: "ru-RU"
                 environmentProfile = EnvironmentProfile.fromName(
                     intent.getStringExtra(EXTRA_ENVIRONMENT_PROFILE)
                 )
@@ -248,7 +250,7 @@ class AudioRecordingService : Service() {
                         updatedAtMs = now,
                         uploadedAtMs = null,
                         deleteAfterMs = deleteAfter,
-                        metadataJson = "sessionId=$chunkSessionId;chunkIndex=$chunkIndex;chunkCount=0;capturedAtMs=$now;durationMs=" + (AppConfig.Audio.chunkDurationSec * 1000L)
+                        metadataJson = "sessionId=$chunkSessionId;chunkIndex=$chunkIndex;chunkCount=0;capturedAtMs=$now;durationMs=" + (AppConfig.Audio.chunkDurationSec * 1000L) + ";language=$recognitionLanguage"
                     )
                 )
                 Diagnostics.info(applicationContext, "AudioRecordingService: enqueued ${file.name}")
@@ -267,5 +269,6 @@ class AudioRecordingService : Service() {
         const val EXTRA_FAR_LECTURER_MODE = "extra_far_lecturer_mode"
         const val EXTRA_ENVIRONMENT_PROFILE = "extra_environment_profile"
         const val EXTRA_PAUSE_ON_INTERRUPTION = "extra_pause_on_interruption"
+        const val EXTRA_RECOGNITION_LANGUAGE = "extra_recognition_language"
     }
 }

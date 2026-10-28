@@ -23,6 +23,7 @@ class QueryDocUploadRepository(private val api: ApiClient) : UploadRepository {
                 fileName = item.displayName,
                 durationMs = metadata.durationMs,
                 capturedAtMs = metadata.capturedAtMs,
+                language = metadata.language,
             )
         ) {
             is ApiResult.Failure -> mapFailure(presign)

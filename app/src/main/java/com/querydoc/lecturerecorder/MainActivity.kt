@@ -127,6 +127,7 @@ class MainActivity : ComponentActivity() {
                             onToggleFarLecturerMode = viewModel::toggleFarLecturerMode,
                             onSetPauseOnInterruptions = viewModel::setPauseOnInterruptions,
                             onSetEnvironmentProfile = viewModel::setEnvironmentProfile,
+                            onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
                             onLogout = { scope.launch { api.logout(); loggedIn = false } },
                             onPauseOrResumeRecording = viewModel::pauseOrResumeRecording,
                             onStopRecording = viewModel::stopRecording,
