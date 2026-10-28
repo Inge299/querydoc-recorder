@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -20,11 +21,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import com.querydoc.lecturerecorder.data.remote.ApiClient
+import com.querydoc.lecturerecorder.ui.ConspectReaderScreen
+import com.querydoc.lecturerecorder.ui.ConspectsScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
 import com.querydoc.lecturerecorder.ui.RecorderScreen
 import com.querydoc.lecturerecorder.ui.RecorderViewModel
 import com.querydoc.lecturerecorder.work.CleanupScheduler
+import com.querydoc.lecturerecorder.work.ConspectCache
 import com.querydoc.lecturerecorder.work.ConspectScheduler
 import com.querydoc.lecturerecorder.work.UploadScheduler
 import kotlinx.coroutines.delay
@@ -52,6 +56,9 @@ class MainActivity : ComponentActivity() {
             var introVisible by remember { mutableStateOf(true) }
             var permissionsRequested by remember { mutableStateOf(false) }
             var restoreAttempted by remember { mutableStateOf(false) }
+            var showConspects by remember { mutableStateOf(false) }
+            var readerSession by remember { mutableStateOf<String?>(null) }
+            var readerMarkdown by remember { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
                 delay(1600)
                 introVisible = false
@@ -86,13 +93,23 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(requestedConspect, introVisible, loggedIn) {
                 if (!introVisible && loggedIn && !requestedConspect.isNullOrBlank()) {
                     pendingConspectSessionId.value = null
-                    viewModel.requestConspect(requestedConspect)
+                    readerMarkdown = ConspectCache.get(applicationContext, requestedConspect)
+                    readerSession = requestedConspect
                 }
             }
             val screen = when {
                 introVisible -> "intro"
-                loggedIn -> "recorder"
-                else -> "login"
+                !loggedIn -> "login"
+                readerSession != null -> "reader"
+                showConspects -> "conspects"
+                else -> "recorder"
+            }
+            BackHandler(enabled = readerSession != null) {
+                readerSession = null
+                readerMarkdown = null
+            }
+            BackHandler(enabled = readerSession == null && showConspects) {
+                showConspects = false
             }
             LaunchedEffect(screen) {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
@@ -120,8 +137,26 @@ class MainActivity : ComponentActivity() {
                             onDeleteRecordings = viewModel::deleteRecordings,
                             onBrightnessRequested = ::applyScreenBrightness,
                             onRequestConspect = viewModel::requestConspect,
-                            onDismissConspect = viewModel::dismissConspect
+                            onDismissConspect = viewModel::dismissConspect,
+                            onOpenConspects = { showConspects = true }
                         )
+                            "conspects" -> ConspectsScreen(
+                                api = api,
+                                onBack = { showConspects = false },
+                                onOpen = { summary ->
+                                    readerMarkdown = summary.markdown
+                                    readerSession = summary.sessionId
+                                },
+                            )
+                            "reader" -> ConspectReaderScreen(
+                                api = api,
+                                sessionId = readerSession.orEmpty(),
+                                initialMarkdown = readerMarkdown,
+                                onBack = {
+                                    readerSession = null
+                                    readerMarkdown = null
+                                },
+                            )
                             else -> LoginScreen(api = api, onLoggedIn = { loggedIn = true })
                         }
                     }

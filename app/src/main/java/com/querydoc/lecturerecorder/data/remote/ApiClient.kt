@@ -38,6 +38,15 @@ data class ConspectState(
     val attempts: Int,
 )
 
+data class ConspectSummary(
+    val sessionId: String,
+    val title: String,
+    val preview: String,
+    val completedAt: String,
+    val length: Int,
+    val markdown: String? = null,
+)
+
 data class SessionProgress(
     val sessionId: String,
     val uploadedChunks: Int,
@@ -322,6 +331,39 @@ class ApiClient(context: Context) {
                 )
             }
             ApiResult.Ok(parseConspect(item))
+        }
+    }
+
+    suspend fun listConspects(): ApiResult<List<ConspectSummary>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/conspects")
+            .get()
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось получить конспекты" },
+                    retryable = response.code >= 500,
+                )
+            }
+            val items = json.optJSONArray("conspects") ?: JSONArray()
+            val values = (0 until items.length()).mapNotNull { index ->
+                val item = items.optJSONObject(index) ?: return@mapNotNull null
+                ConspectSummary(
+                    sessionId = item.optString("sessionId"),
+                    title = item.optString("title").ifBlank { "Конспект лекции" },
+                    preview = item.optString("preview"),
+                    completedAt = item.optString("completedAt"),
+                    length = item.optInt("length"),
+                )
+            }
+            ApiResult.Ok(values)
         }
     }
 

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FiberManualRecord
@@ -98,7 +100,8 @@ fun RecorderScreen(
     onDeleteRecordings: (Set<String>) -> Unit,
     onBrightnessRequested: (Float?) -> Unit,
     onRequestConspect: (String) -> Unit,
-    onDismissConspect: () -> Unit
+    onDismissConspect: () -> Unit,
+    onOpenConspects: () -> Unit
 ) {
     val uiState by state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -407,6 +410,21 @@ fun RecorderScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(text = "История", style = MaterialTheme.typography.bodySmall)
+                    if (!selectionMode) {
+                        TextButton(
+                            onClick = onOpenConspects,
+                            contentPadding = PaddingValues(horizontal = 6.dp),
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MenuBook,
+                                contentDescription = null,
+                                tint = Color(0xFF4338CA),
+                                modifier = Modifier.size(16.dp),
+                            )
+                            Spacer(Modifier.size(4.dp))
+                            Text("Конспекты", style = MaterialTheme.typography.labelMedium)
+                        }
+                    }
                     if (selectionMode) {
                         Row(
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
@@ -668,54 +686,6 @@ private fun RecordingItemRow(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun ConspectMarkdown(markdown: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        markdown.lines().forEach { rawLine ->
-            val line = rawLine.trimEnd()
-            when {
-                line.startsWith("# ") -> Text(
-                    text = line.removePrefix("# ").trim(),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                )
-                line.startsWith("## ") -> Text(
-                    text = line.removePrefix("## ").trim(),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 8.dp),
-                )
-                line.startsWith("- ") || line.startsWith("* ") -> Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text("•", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4338CA))
-                    Text(
-                        text = inlineBold(line.drop(2).trim()),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-                line.isBlank() -> Spacer(Modifier.height(4.dp))
-                else -> Text(
-                    text = inlineBold(line),
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-    }
-}
-
-private fun inlineBold(text: String): AnnotatedString = buildAnnotatedString {
-    val parts = text.split("**")
-    parts.forEachIndexed { index, part ->
-        if (index % 2 == 1) {
-            withStyle(SpanStyle(fontWeight = FontWeight.Bold)) { append(part) }
-        } else {
-            append(part)
         }
     }
 }
