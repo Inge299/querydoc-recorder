@@ -22,6 +22,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
@@ -128,7 +129,7 @@ fun ConspectsScreen(
         ) {
             Column {
                 Text(
-                    text = "Ваши лекции",
+                    text = "БИБЛИОТЕКА",
                     color = Color(0xFFC7D2FE),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -142,7 +143,7 @@ fun ConspectsScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Собраны автоматически после записи",
+                    text = "Только готовые конспекты",
                     color = Color(0xFF9CA3AF),
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -212,8 +213,8 @@ private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8F7FF)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier = Modifier.padding(14.dp),
@@ -224,33 +225,46 @@ private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
                 modifier = Modifier
                     .size(46.dp)
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF4338CA), Color(0xFF6D5AE6)))),
+                    .background(Brush.linearGradient(listOf(Color(0xFF4338CA), Color(0xFF7C6AE8)))),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Article, contentDescription = null, tint = Color.White, modifier = Modifier.size(23.dp))
+                Icon(Icons.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(23.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = "КОНСПЕКТ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF6D5AE6),
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.8.sp,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    if (item.completedAt.isNotBlank()) {
+                        Text(
+                            text = formatConspectDate(item.completedAt),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF94A3B8),
+                        )
+                    }
+                }
                 Text(
-                    text = item.title.ifBlank { "Конспект лекции" },
-                    style = MaterialTheme.typography.titleSmall,
+                    text = displayTitle(item.title),
+                    style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF0F172A),
+                    color = Color(0xFF1E1B4B),
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
                 )
-                if (item.completedAt.isNotBlank()) {
-                    Text(
-                        text = formatConspectDate(item.completedAt),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF64748B),
-                        modifier = Modifier.padding(top = 2.dp),
-                    )
-                }
                 if (item.preview.isNotBlank()) {
                     Text(
                         text = item.preview,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF475569),
+                        color = Color(0xFF64748B),
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 6.dp),
@@ -261,7 +275,7 @@ private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = "Читать",
+                        text = "Читать конспект",
                         style = MaterialTheme.typography.labelMedium,
                         color = Color(0xFF4338CA),
                         fontWeight = FontWeight.SemiBold,
@@ -279,6 +293,23 @@ private fun ConspectRow(item: ConspectSummary, onClick: () -> Unit) {
                 }
             }
         }
+    }
+}
+
+private fun displayTitle(raw: String): String {
+    val title = raw.trim()
+    if (title.isBlank()) return "Конспект лекции"
+    if (title.startsWith("Аудиозапись", ignoreCase = true) || title.startsWith("Аудиосессия", ignoreCase = true)) {
+        return "Конспект лекции"
+    }
+    val unwrapped = title
+        .removePrefix("Конспект лекции «")
+        .removeSuffix("»")
+        .trim()
+    return if (unwrapped.startsWith("Аудиозапись", ignoreCase = true) || unwrapped.startsWith("Аудиосессия", ignoreCase = true)) {
+        "Конспект лекции"
+    } else {
+        unwrapped.ifBlank { "Конспект лекции" }
     }
 }
 
