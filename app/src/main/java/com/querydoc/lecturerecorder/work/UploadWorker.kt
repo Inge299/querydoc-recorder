@@ -70,7 +70,7 @@ class UploadWorker(
                 val expectedChunks = entries.mapNotNull { (meta, _) -> meta.chunkCount }.maxOrNull()
                 val allUploaded = entries.all { (_, item) -> item.status == UploadStatus.UPLOADED }
                 val enoughChunks = expectedChunks == null || entries.size >= expectedChunks
-                if (allUploaded && enoughChunks) {
+                if (allUploaded && enoughChunks && SessionCompletionStore.isComplete(applicationContext, sessionId)) {
                     Diagnostics.info(applicationContext, "UploadWorker: session complete, scheduling conspect $sessionId")
                     ConspectScheduler.enqueue(applicationContext, sessionId)
                 }

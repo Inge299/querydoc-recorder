@@ -14,14 +14,17 @@ import com.querydoc.lecturerecorder.data.local.MediaType
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
+import com.querydoc.lecturerecorder.work.SessionCompletionStore
 import com.querydoc.lecturerecorder.work.UploadScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicInteger
 
 class AudioRecordingService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -33,6 +36,7 @@ class AudioRecordingService : Service() {
     private var environmentProfile = EnvironmentProfile.NORMAL
     private var sessionId: String = UUID.randomUUID().toString()
     private var chunkCounter: Int = 0
+    private val pendingChunkInserts = AtomicInteger(0)
     private var wakeLock: PowerManager.WakeLock? = null
     private var resumeAfterFocusGain = false
     private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
@@ -145,8 +149,15 @@ class AudioRecordingService : Service() {
         isPaused = false
         val active = recorder
         recorder = null
+        val completedSessionId = sessionId
         serviceScope.launch {
             runCatching { active?.stop() }
+            // The final chunk is inserted from a callback. Wait for that insert
+            // before marking the session complete, otherwise UploadWorker would
+            // see only the first chunk and generate a conspect too early.
+            while (pendingChunkInserts.get() > 0) delay(25)
+            SessionCompletionStore.markComplete(applicationContext, completedSessionId)
+            UploadScheduler.enqueue(applicationContext)
             abandonAudioFocus()
             releaseWakeLock()
             Diagnostics.info(applicationContext, "AudioRecordingService: stopped")
@@ -218,27 +229,33 @@ class AudioRecordingService : Service() {
     private fun enqueueAudioChunk(file: File) {
         if (!file.exists() || file.length() == 0L) return
         val chunkIndex = chunkCounter++
+        val chunkSessionId = sessionId
+        pendingChunkInserts.incrementAndGet()
         serviceScope.launch {
-            val now = System.currentTimeMillis()
-            val deleteAfter = now + AppConfig.Storage.cleanupAfterDays * 24L * 60L * 60L * 1_000L
-            AppGraph.db(applicationContext).uploadQueueDao().upsert(
-                UploadQueueEntity(
-                    id = UUID.randomUUID().toString(),
-                    displayName = file.name,
-                    mediaType = MediaType.AUDIO_CHUNK,
-                    filePath = file.absolutePath,
-                    mimeType = "audio/mp4",
-                    status = UploadStatus.PENDING,
-                    retryCount = 0,
-                    createdAtMs = now,
-                    updatedAtMs = now,
-                    uploadedAtMs = null,
-                    deleteAfterMs = deleteAfter,
-                    metadataJson = "sessionId=$sessionId;chunkIndex=$chunkIndex;chunkCount=0;capturedAtMs=$now;durationMs=" + (AppConfig.Audio.chunkDurationSec * 1000L)
+            try {
+                val now = System.currentTimeMillis()
+                val deleteAfter = now + AppConfig.Storage.cleanupAfterDays * 24L * 60L * 60L * 1_000L
+                AppGraph.db(applicationContext).uploadQueueDao().upsert(
+                    UploadQueueEntity(
+                        id = UUID.randomUUID().toString(),
+                        displayName = file.name,
+                        mediaType = MediaType.AUDIO_CHUNK,
+                        filePath = file.absolutePath,
+                        mimeType = "audio/mp4",
+                        status = UploadStatus.PENDING,
+                        retryCount = 0,
+                        createdAtMs = now,
+                        updatedAtMs = now,
+                        uploadedAtMs = null,
+                        deleteAfterMs = deleteAfter,
+                        metadataJson = "sessionId=$chunkSessionId;chunkIndex=$chunkIndex;chunkCount=0;capturedAtMs=$now;durationMs=" + (AppConfig.Audio.chunkDurationSec * 1000L)
+                    )
                 )
-            )
-            Diagnostics.info(applicationContext, "AudioRecordingService: enqueued ${file.name}")
-            UploadScheduler.enqueue(applicationContext)
+                Diagnostics.info(applicationContext, "AudioRecordingService: enqueued ${file.name}")
+                UploadScheduler.enqueue(applicationContext)
+            } finally {
+                pendingChunkInserts.decrementAndGet()
+            }
         }
     }
 
