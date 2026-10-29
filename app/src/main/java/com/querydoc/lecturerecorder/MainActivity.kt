@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
@@ -56,13 +57,13 @@ class MainActivity : ComponentActivity() {
             val recorderState by viewModel.state.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
             var loggedIn by remember { mutableStateOf(api.hasSession()) }
-            var introVisible by remember { mutableStateOf(true) }
+            var introVisible by rememberSaveable { mutableStateOf(true) }
             var permissionsRequested by remember { mutableStateOf(false) }
             var restoreAttempted by remember { mutableStateOf(false) }
-            var showConspects by remember { mutableStateOf(false) }
-            var showSettings by remember { mutableStateOf(false) }
-            var readerSession by remember { mutableStateOf<String?>(null) }
-            var readerMarkdown by remember { mutableStateOf<String?>(null) }
+            var showConspects by rememberSaveable { mutableStateOf(false) }
+            var showSettings by rememberSaveable { mutableStateOf(false) }
+            var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
+            var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
                 delay(1600)
                 introVisible = false
@@ -182,6 +183,11 @@ class MainActivity : ComponentActivity() {
                                 api = api,
                                 sessionId = readerSession.orEmpty(),
                                 initialMarkdown = readerMarkdown,
+                                playerState = recorderState,
+                                onPlay = viewModel::playRecordingById,
+                                onPause = viewModel::pausePlaybackForItem,
+                                onStop = viewModel::stopPlaybackForItem,
+                                onSeek = viewModel::seekPlaybackPosition,
                                 onBack = {
                                     readerSession = null
                                     readerMarkdown = null

@@ -1,7 +1,10 @@
 package com.querydoc.lecturerecorder.ui
 
+import android.content.res.Configuration
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
@@ -27,17 +30,20 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.MenuBook
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.DoneAll
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.FiberManualRecord
@@ -68,6 +74,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
@@ -156,6 +163,7 @@ fun RecorderScreen(
         }
     }
 
+    val isLandscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val sectionShape = RoundedCornerShape(14.dp)
     Column(
         modifier = Modifier
@@ -171,6 +179,7 @@ fun RecorderScreen(
             }
             .statusBarsPadding()
             .navigationBarsPadding()
+            .then(if (isLandscape) Modifier.verticalScroll(rememberScrollState()) else Modifier)
             .padding(8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -341,7 +350,12 @@ fun RecorderScreen(
             }
         }
 
-        Card(shape = sectionShape, modifier = Modifier.fillMaxWidth().weight(1f)) {
+        Card(
+            shape = sectionShape,
+            modifier = Modifier
+                .fillMaxWidth()
+                .then(if (isLandscape) Modifier.height(360.dp) else Modifier.weight(1f)),
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -383,14 +397,34 @@ fun RecorderScreen(
                     }
                 }
 
-                if (uiState.recordings.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text("Пока нет записей")
+                val visibleRecordings = uiState.recordings.filterNot { it.stage == RecordingStage.RECOGNIZED }
+                if (visibleRecordings.isEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = if (uiState.recordings.isEmpty()) "Пока нет записей" else "Все лекции уже в Конспектах",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color(0xFF334155),
+                        )
+                        Text(
+                            text = if (uiState.recordings.isEmpty()) "Нажмите «Запись», чтобы начать" else "Готовые лекции, транскрипты и аудио — в библиотеке",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(top = 4.dp),
+                        )
+                        if (uiState.recordings.isNotEmpty()) {
+                            TextButton(onClick = onOpenConspects, modifier = Modifier.padding(top = 8.dp)) {
+                                Text("Открыть Конспекты")
+                            }
+                        }
                     }
                 } else {
                     val listTapInteraction = remember { MutableInteractionSource() }
                     val stageGroups = RecordingStage.entries
-                        .map { stage -> stage to uiState.recordings.filter { it.stage == stage } }
+                        .map { stage -> stage to visibleRecordings.filter { it.stage == stage } }
                         .filter { it.second.isNotEmpty() }
                     LazyColumn(
                         modifier = Modifier
@@ -559,33 +593,45 @@ private fun RecordingItemRow(
                 onClick = { if (isSelectionMode) onToggleSelection() else onFocus() },
                 onLongClick = onEnterSelection
             ),
-        colors = CardDefaults.cardColors(containerColor = if (isSelected) Color(0xFFDDEAFD) else Color(0xFFF8FAFC)),
-        shape = RoundedCornerShape(10.dp)
+        colors = CardDefaults.cardColors(containerColor = if (isSelected) Color(0xFFDDEAFD) else Color.White),
+        shape = RoundedCornerShape(14.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF93C5FD) else Color(0xFFE8ECF3)),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalArrangement = Arrangement.spacedBy(1.dp)
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                StatusIcon(item.status)
-                Text(
-                    text = item.createdAtLabel,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1
-                )
+                StatusBadge(status = item.status, stage = item.stage)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = item.createdAtLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F172A),
+                        maxLines = 1
+                    )
+                    Text(
+                        text = stageHint(item.stage),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = stageColor(item.stage),
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
                 Text(
                     text = if (isCurrent) {
                         "${formatDurationMs(playbackPositionMs)}/${formatDurationMs(safeDuration)}"
                     } else {
                         formatDurationMs(safeDuration)
                     },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color(0xFF334155)
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color(0xFF475569)
                 )
             }
             if (isFocused) {
@@ -701,6 +747,45 @@ private fun ControlButton(
             style = MaterialTheme.typography.labelSmall,
             color = if (enabled) Color(0xFF334155) else Color(0xFF94A3B8),
             maxLines = 1,
+        )
+    }
+}
+
+private fun stageColor(stage: RecordingStage): Color = when (stage) {
+    RecordingStage.LOCAL -> Color(0xFFF59E0B)
+    RecordingStage.CLOUD -> Color(0xFF0284C7)
+    RecordingStage.RECOGNIZED -> Color(0xFF16A34A)
+    RecordingStage.FAILED -> Color(0xFFDC2626)
+}
+
+private fun stageHint(stage: RecordingStage): String = when (stage) {
+    RecordingStage.LOCAL -> "Записано на устройстве"
+    RecordingStage.CLOUD -> "Загружено в облако"
+    RecordingStage.RECOGNIZED -> "Конспект готов"
+    RecordingStage.FAILED -> "Нужно повторить загрузку"
+}
+
+@Composable
+private fun StatusBadge(status: UploadStatus, stage: RecordingStage) {
+    val color = stageColor(stage)
+    val icon = when (stage) {
+        RecordingStage.LOCAL -> Icons.Filled.Mic
+        RecordingStage.CLOUD -> if (status == UploadStatus.UPLOADING) Icons.Filled.CloudUpload else Icons.Filled.CloudDone
+        RecordingStage.RECOGNIZED -> Icons.Filled.CheckCircle
+        RecordingStage.FAILED -> Icons.Filled.ErrorOutline
+    }
+    Box(
+        modifier = Modifier
+            .size(44.dp)
+            .background(color.copy(alpha = 0.14f), CircleShape)
+            .border(1.dp, color.copy(alpha = 0.30f), CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = "Статус: ${stage.label}",
+            tint = color,
+            modifier = Modifier.size(23.dp),
         )
     }
 }

@@ -25,6 +25,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Headphones
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -32,11 +36,14 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -57,6 +64,11 @@ fun ConspectReaderScreen(
     api: ApiClient,
     sessionId: String,
     initialMarkdown: String?,
+    playerState: RecorderUiState,
+    onPlay: (String, Float?) -> Unit,
+    onPause: (String) -> Unit,
+    onStop: (String) -> Unit,
+    onSeek: (String, Float) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -116,7 +128,7 @@ fun ConspectReaderScreen(
         .orEmpty()
         .ifBlank { "Конспект" }
     val shareText = if (tab == 0) markdown else transcript
-    val canShare = shareText.isNotBlank()
+    val canShare = tab != 2 && shareText.isNotBlank()
 
     Column(
         modifier = Modifier
@@ -136,7 +148,7 @@ fun ConspectReaderScreen(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = if (tab == 0) "Конспект" else "Транскрипт",
+                    text = when (tab) { 0 -> "Конспект"; 1 -> "Транскрипт"; else -> "Аудиозапись" },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF0F172A),
@@ -180,6 +192,7 @@ fun ConspectReaderScreen(
         ) {
             ReaderTab("Конспект", selected = tab == 0, modifier = Modifier.weight(1f)) { tab = 0 }
             ReaderTab("Транскрипт", selected = tab == 1, modifier = Modifier.weight(1f)) { tab = 1 }
+            ReaderTab("Аудио", selected = tab == 2, modifier = Modifier.weight(1f)) { tab = 2 }
         }
 
         if (tab == 0) {
@@ -233,7 +246,7 @@ fun ConspectReaderScreen(
                     Spacer(Modifier.height(24.dp))
                 }
             }
-        } else {
+        } else if (tab == 1) {
             when {
                 transcriptLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Color(0xFF4338CA))
@@ -270,8 +283,125 @@ fun ConspectReaderScreen(
                     Spacer(Modifier.height(24.dp))
                 }
             }
+        } else {
+            AudioTabContent(
+                sessionId = sessionId,
+                playerState = playerState,
+                onPlay = onPlay,
+                onPause = onPause,
+                onStop = onStop,
+                onSeek = onSeek,
+            )
         }
     }
+}
+
+@Composable
+private fun AudioTabContent(
+    sessionId: String,
+    playerState: RecorderUiState,
+    onPlay: (String, Float?) -> Unit,
+    onPause: (String) -> Unit,
+    onStop: (String) -> Unit,
+    onSeek: (String, Float) -> Unit,
+) {
+    val recording = playerState.recordings.firstOrNull { it.id == sessionId }
+    val isCurrent = playerState.currentPlaybackItemId == sessionId
+    val totalMs = if (isCurrent && playerState.playbackDurationMs > 0L) playerState.playbackDurationMs else (recording?.durationMs ?: 0L)
+    val positionMs = if (isCurrent) playerState.playbackPositionMs else 0L
+    val progress = if (totalMs > 0L) (positionMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f) else 0f
+    var sliderValue by remember(sessionId, progress, totalMs) { mutableFloatStateOf(progress) }
+    val isPlaying = isCurrent && playerState.isPlayingLocalAudio
+    val isPaused = isCurrent && playerState.isPlaybackPaused
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+        ) {
+            Column(modifier = Modifier.padding(18.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .background(Color(0xFFE0E7FF), RoundedCornerShape(13.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Filled.Headphones, contentDescription = null, tint = Color(0xFF4338CA), modifier = Modifier.size(22.dp))
+                    }
+                    Column {
+                        Text("Аудиозапись лекции", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            text = if (recording == null) "Файл недоступен на устройстве" else "Можно слушать прямо здесь",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF64748B),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                Slider(
+                    value = sliderValue,
+                    onValueChange = { sliderValue = it },
+                    onValueChangeFinished = { onSeek(sessionId, sliderValue) },
+                    valueRange = 0f..1f,
+                    enabled = recording != null,
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(formatAudioTime(if (isCurrent) positionMs else (totalMs * sliderValue).toLong()), style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+                    Text(formatAudioTime(totalMs), style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    IconButton(
+                        onClick = { if (isPlaying) onPause(sessionId) else onPlay(sessionId, if (isCurrent) null else sliderValue) },
+                        enabled = recording != null,
+                        modifier = Modifier.size(56.dp).background(Color(0xFF4338CA), RoundedCornerShape(28.dp)),
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                            contentDescription = if (isPlaying) "Пауза" else "Слушать",
+                            tint = Color.White,
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                    if (isCurrent) {
+                        IconButton(
+                            onClick = { onStop(sessionId) },
+                            modifier = Modifier.size(48.dp).padding(start = 8.dp),
+                        ) {
+                            Icon(Icons.Filled.Stop, contentDescription = "Стоп", tint = Color(0xFF64748B))
+                        }
+                    }
+                }
+                if (isCurrent && playerState.playbackStatus.isNotBlank()) {
+                    Text(
+                        text = playerState.playbackStatus,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF94A3B8),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun formatAudioTime(ms: Long): String {
+    val total = (ms / 1000L).coerceAtLeast(0L)
+    val h = total / 3600
+    val m = (total % 3600) / 60
+    val s = total % 60
+    return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
 }
 
 @Composable
