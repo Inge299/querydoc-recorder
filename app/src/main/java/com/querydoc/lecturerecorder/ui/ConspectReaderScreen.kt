@@ -8,6 +8,12 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +34,9 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Pause
@@ -57,10 +66,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -69,8 +80,11 @@ import androidx.compose.ui.unit.dp
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.local.BookmarkStore
+import com.querydoc.lecturerecorder.data.remote.LectureCitation
+import com.querydoc.lecturerecorder.data.remote.QaHistoryTurn
 import com.querydoc.lecturerecorder.data.local.AudioBookmark
 import com.querydoc.lecturerecorder.work.ConspectCache
+import kotlinx.coroutines.launch
 
 @Composable
 fun ConspectReaderScreen(
@@ -95,6 +109,7 @@ fun ConspectReaderScreen(
     var transcriptLoading by remember { mutableStateOf(false) }
     var transcriptError by remember { mutableStateOf("") }
     var transcriptReload by remember { mutableStateOf(0) }
+    var showStudyKit by remember { mutableStateOf(false) }
 
     LaunchedEffect(reload) {
         val cached = ConspectCache.get(context, sessionId)
@@ -140,8 +155,13 @@ fun ConspectReaderScreen(
         ?.trim()
         .orEmpty()
         .ifBlank { "Конспект" }
-    val shareText = if (tab == 0) markdown else transcript
-    val canShare = tab != 2 && shareText.isNotBlank()
+    val shareText = when (tab) { 0 -> markdown; 1 -> transcript; else -> "" }
+    val canShare = (tab == 0 || tab == 1) && shareText.isNotBlank()
+
+    if (showStudyKit) {
+        StudyKitScreen(api = api, sessionId = sessionId, onBack = { showStudyKit = false })
+        return
+    }
 
     Column(
         modifier = Modifier
@@ -161,7 +181,7 @@ fun ConspectReaderScreen(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = when (tab) { 0 -> "Конспект"; 1 -> "Транскрипт"; else -> "Аудиозапись" },
+                    text = when (tab) { 0 -> "Конспект"; 1 -> "Транскрипт"; 2 -> "Аудиозапись"; else -> "Вопросы по лекции" },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF0F172A),
@@ -172,6 +192,11 @@ fun ConspectReaderScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF92400E),
                     )
+                }
+            }
+            if (tab == 0) {
+                IconButton(onClick = { showStudyKit = true }) {
+                    Icon(Icons.Filled.School, contentDescription = "Проверка", tint = Color(0xFF4338CA))
                 }
             }
             if (canShare) {
@@ -204,8 +229,9 @@ fun ConspectReaderScreen(
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
             ReaderTab("Конспект", selected = tab == 0, modifier = Modifier.weight(1f)) { tab = 0 }
-            ReaderTab("Транскрипт", selected = tab == 1, modifier = Modifier.weight(1f)) { tab = 1 }
+            ReaderTab("Текст", selected = tab == 1, modifier = Modifier.weight(1f)) { tab = 1 }
             ReaderTab("Аудио", selected = tab == 2, modifier = Modifier.weight(1f)) { tab = 2 }
+            ReaderTab("Вопрос", selected = tab == 3, modifier = Modifier.weight(1f)) { tab = 3 }
         }
 
         if (tab == 0) {
@@ -256,6 +282,14 @@ fun ConspectReaderScreen(
                             ConspectMarkdown(bodyMarkdown)
                         }
                     }
+                    Spacer(Modifier.height(12.dp))
+                    Button(
+                        onClick = { showStudyKit = true },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Filled.School, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Text("  Проверить себя: 5 вопросов")
+                    }
                     Spacer(Modifier.height(24.dp))
                 }
             }
@@ -296,7 +330,7 @@ fun ConspectReaderScreen(
                     Spacer(Modifier.height(24.dp))
                 }
             }
-        } else {
+        } else if (tab == 2) {
             AudioTabContent(
                 sessionId = sessionId,
                 playerState = playerState,
@@ -305,6 +339,186 @@ fun ConspectReaderScreen(
                 onStop = onStop,
                 onSeek = onSeek,
             )
+        } else {
+            LectureQaContent(
+                api = api,
+                sessionId = sessionId,
+                playerState = playerState,
+                onOpenCitation = { citation ->
+                    val recording = playerState.recordings.firstOrNull { it.id == sessionId }
+                    val total = recording?.durationMs?.coerceAtLeast(1L) ?: 1L
+                    val fraction = (citation.startMs.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+                    tab = 2
+                    if (playerState.currentPlaybackItemId == sessionId) {
+                        onSeek(sessionId, fraction)
+                    } else {
+                        onPlay(sessionId, fraction)
+                    }
+                },
+            )
+        }
+    }
+}
+
+private data class QaMessage(
+    val role: String,
+    val text: String,
+    val citations: List<LectureCitation> = emptyList(),
+)
+
+@Composable
+private fun LectureQaContent(
+    api: ApiClient,
+    sessionId: String,
+    playerState: RecorderUiState,
+    onOpenCitation: (LectureCitation) -> Unit,
+) {
+    var messages by remember(sessionId) { mutableStateOf(listOf<QaMessage>()) }
+    var input by remember(sessionId) { mutableStateOf("") }
+    var loading by remember(sessionId) { mutableStateOf(false) }
+    var error by remember(sessionId) { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
+    val listState = rememberLazyListState()
+
+    fun send(question: String) {
+        val trimmed = question.trim()
+        if (trimmed.isBlank() || loading) return
+        val history = messages.map { QaHistoryTurn(it.role, it.text) }
+        messages = messages + QaMessage("user", trimmed)
+        input = ""
+        error = ""
+        loading = true
+        scope.launch {
+            when (val result = api.askLecture(sessionId, trimmed, history)) {
+                is ApiResult.Ok -> {
+                    messages = messages + QaMessage("assistant", result.value.answer, result.value.citations)
+                }
+                is ApiResult.Failure -> {
+                    error = result.message
+                }
+            }
+            loading = false
+        }
+    }
+
+    LaunchedEffect(messages.size, loading) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem((messages.size + if (loading) 1 else 0).coerceAtLeast(1) - 1)
+        }
+    }
+
+    Column(modifier = Modifier.fillMaxSize().imePadding()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.weight(1f),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (messages.isEmpty()) {
+                item(key = "qa_empty") {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                    ) {
+                        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Filled.SmartToy, contentDescription = null, tint = Color(0xFF4338CA), modifier = Modifier.size(28.dp))
+                            Text("Спросите лекцию", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Ответ строится только по этой лекции. В цитатах будут таймкоды — можно сразу перейти к нужному месту.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF64748B),
+                            )
+                        }
+                    }
+                }
+                item(key = "qa_suggestions") {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf(
+                            "О чём эта лекция?",
+                            "Объясни главную мысль",
+                            "Какие выводы нужно запомнить?",
+                        ).forEach { text ->
+                            TextButton(onClick = { send(text) }, enabled = !loading) {
+                                Text(text, color = Color(0xFF4338CA))
+                            }
+                        }
+                    }
+                }
+            }
+            items(messages, key = { it.role + it.text.hashCode() }) { message ->
+                val isUser = message.role == "user"
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start,
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(0.92f),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (isUser) Color(0xFF4338CA) else Color.White,
+                        ),
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            if (isUser) {
+                                Text(
+                                    message.text,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color.White,
+                                )
+                            } else {
+                                ConspectMarkdown(message.text)
+                            }
+                            message.citations.forEach { citation ->
+                                TextButton(
+                                    onClick = { onOpenCitation(citation) },
+                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                ) {
+                                    Text(
+                                        "[${citation.index}] ${citation.time} · перейти",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (isUser) Color(0xFFE0E7FF) else Color(0xFF4338CA),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if (loading) {
+                item(key = "qa_loading") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        Text("Ищу ответ по лекции…", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                    }
+                }
+            }
+            if (error.isNotBlank()) {
+                item(key = "qa_error") {
+                    Text(error, style = MaterialTheme.typography.bodySmall, color = Color(0xFFDC2626))
+                }
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.Bottom,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            OutlinedTextField(
+                value = input,
+                onValueChange = { input = it.take(2_000) },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("Вопрос по лекции…") },
+                maxLines = 4,
+            )
+            IconButton(
+                onClick = { send(input) },
+                enabled = input.isNotBlank() && !loading,
+                modifier = Modifier.size(48.dp).background(Color(0xFF4338CA), RoundedCornerShape(24.dp)),
+            ) {
+                Icon(Icons.Filled.Send, contentDescription = "Отправить", tint = Color.White)
+            }
         }
     }
 }

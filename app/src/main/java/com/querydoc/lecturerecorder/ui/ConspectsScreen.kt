@@ -19,12 +19,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Article
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
@@ -37,6 +41,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -57,11 +62,13 @@ import android.widget.Toast
 import kotlinx.coroutines.launch
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectSummary
+import com.querydoc.lecturerecorder.data.remote.SubjectSummary
 import com.querydoc.lecturerecorder.work.ConspectCache
 import java.time.Instant
 import java.time.ZoneId
@@ -80,9 +87,21 @@ fun ConspectsScreen(
     var items by remember { mutableStateOf<List<ConspectSummary>>(emptyList()) }
     var reload by remember { mutableIntStateOf(0) }
     var deleteTarget by remember { mutableStateOf<ConspectSummary?>(null) }
+    var subjectTarget by remember { mutableStateOf<ConspectSummary?>(null) }
+    var subjects by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
+    var showSubjectsManager by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
     val scope = rememberCoroutineScope()
+
+    if (showSubjectsManager) {
+        SubjectsManagerScreen(
+            api = api,
+            onBack = { showSubjectsManager = false },
+            onChanged = { reload += 1 },
+        )
+        return
+    }
 
     LaunchedEffect(reload) {
         loading = true
@@ -91,6 +110,10 @@ fun ConspectsScreen(
                 items = result.value
                 cachedIds = ConspectCache.list(context).map { it.sessionId }.toSet()
                 offline = false
+                when (val subjectResult = api.listSubjects()) {
+                    is ApiResult.Ok -> subjects = subjectResult.value
+                    is ApiResult.Failure -> Unit
+                }
             }
             is ApiResult.Failure -> {
                 items = ConspectCache.list(context)
@@ -124,6 +147,9 @@ fun ConspectsScreen(
                 color = Color(0xFF0F172A),
                 modifier = Modifier.weight(1f),
             )
+            IconButton(onClick = { showSubjectsManager = true }) {
+                Icon(Icons.Filled.Category, contentDescription = "Предметы", tint = Color(0xFF4338CA))
+            }
             IconButton(onClick = { reload += 1 }) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Обновить", tint = Color(0xFF4338CA))
             }
@@ -217,6 +243,7 @@ fun ConspectsScreen(
                                     Toast.makeText(context, "Копия удалена с устройства", Toast.LENGTH_SHORT).show()
                                 },
                                 onDeleteRemote = { deleteTarget = item },
+                                onEditSubject = { subjectTarget = item },
                             )
                         }
                     }
@@ -225,6 +252,25 @@ fun ConspectsScreen(
         }
     }
 
+
+    subjectTarget?.let { target ->
+        SubjectAssignDialog(
+            api = api,
+            item = target,
+            subjects = subjects,
+            onDismiss = { subjectTarget = null },
+            onManage = {
+                subjectTarget = null
+                showSubjectsManager = true
+            },
+            onAssigned = { subjectId, subjectName ->
+                items = items.map {
+                    if (it.sessionId == target.sessionId) it.copy(subjectId = subjectId, subject = subjectName) else it
+                }
+                subjectTarget = null
+            },
+        )
+    }
 
     deleteTarget?.let { target ->
         AlertDialog(
@@ -265,6 +311,97 @@ private fun conspectWord(count: Int): String = when {
     count % 10 == 1 && count % 100 != 11 -> "конспект"
     count % 10 in 2..4 && count % 100 !in 12..14 -> "конспекта"
     else -> "конспектов"
+}
+
+@Composable
+private fun SubjectAssignDialog(
+    api: ApiClient,
+    item: ConspectSummary,
+    subjects: List<SubjectSummary>,
+    onDismiss: () -> Unit,
+    onManage: () -> Unit,
+    onAssigned: (String, String) -> Unit,
+) {
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf("") }
+    var newName by remember { mutableStateOf(item.subject) }
+    val scope = rememberCoroutineScope()
+
+    fun assign(subjectId: String?, name: String?) {
+        if (busy) return
+        busy = true
+        error = ""
+        scope.launch {
+            when (val result = api.assignSubject(item.sessionId, subjectId, name)) {
+                is ApiResult.Ok -> {
+                    val resolvedName = name ?: subjects.firstOrNull { it.id == subjectId }?.name.orEmpty()
+                    onAssigned(subjectId.orEmpty(), resolvedName)
+                }
+                is ApiResult.Failure -> error = result.message
+            }
+            busy = false
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!busy) onDismiss() },
+        title = { Text("Предмет лекции") },
+        text = {
+            Column(
+                modifier = Modifier
+                    .height(360.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text(
+                    if (item.subject.isBlank()) "Выберите предмет или создайте новый." else "Похоже на «${item.subject}». Подтвердите или выберите другой.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF64748B),
+                )
+                subjects.forEach { subject ->
+                    TextButton(
+                        onClick = { assign(subject.id, null) },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(
+                            (if (subject.id == item.subjectId) "✓ " else "") + subject.name,
+                            modifier = Modifier.fillMaxWidth(),
+                            textAlign = TextAlign.Start,
+                        )
+                    }
+                }
+                if (item.subject.isNotBlank() && subjects.none { it.name.equals(item.subject, ignoreCase = true) }) {
+                    TextButton(
+                        onClick = { assign(null, item.subject) },
+                        enabled = !busy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Создать «${item.subject}»", color = Color(0xFF4338CA))
+                    }
+                }
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it.take(80) },
+                    singleLine = true,
+                    label = { Text("Новый предмет") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    onClick = { if (newName.isNotBlank()) assign(null, newName.trim()) },
+                    enabled = newName.isNotBlank() && !busy,
+                ) { Text("Сохранить новый") }
+                TextButton(onClick = onManage, enabled = !busy) { Text("Управлять предметами") }
+                if (error.isNotBlank()) Text(error, color = Color(0xFFDC2626), style = MaterialTheme.typography.bodySmall)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { assign(null, null) }, enabled = !busy) {
+                Text("Без предмета", color = Color(0xFF64748B))
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Отмена") } },
+    )
 }
 
 private fun formatConspectDate(value: String): String {
@@ -308,6 +445,7 @@ private fun ConspectRow(
     onClick: () -> Unit,
     onRemoveLocal: () -> Unit,
     onDeleteRemote: () -> Unit,
+    onEditSubject: () -> Unit,
 ) {
     var menuExpanded by remember { mutableStateOf(false) }
     Card(
@@ -371,6 +509,14 @@ private fun ConspectRow(
                                 )
                             }
                             DropdownMenuItem(
+                                text = { Text("Изменить предмет") },
+                                leadingIcon = { Icon(Icons.Filled.Edit, contentDescription = null, tint = Color(0xFF4338CA)) },
+                                onClick = {
+                                    menuExpanded = false
+                                    onEditSubject()
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Удалить конспект", color = Color(0xFFDC2626)) },
                                 leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = Color(0xFFDC2626)) },
                                 onClick = {
@@ -381,14 +527,28 @@ private fun ConspectRow(
                         }
                     }
                 }
-                if (item.subject.isNotBlank()) {
+                Row(
+                    modifier = Modifier
+                        .padding(top = 2.dp)
+                        .clickable(onClick = onEditSubject),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     Text(
-                        text = item.subject.uppercase(),
+                        text = when {
+                            item.subject.isBlank() -> "Без предмета"
+                            item.subjectId.isBlank() -> "${item.subject} · подтвердить"
+                            else -> item.subject
+                        }.uppercase(),
                         style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF7C6AE8),
+                        color = if (item.subjectId.isBlank()) Color(0xFFB45309) else Color(0xFF7C6AE8),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = "Изменить предмет",
+                        tint = if (item.subjectId.isBlank()) Color(0xFFB45309) else Color(0xFF94A3B8),
+                        modifier = Modifier.padding(start = 4.dp).size(12.dp),
                     )
                 }
                 Text(

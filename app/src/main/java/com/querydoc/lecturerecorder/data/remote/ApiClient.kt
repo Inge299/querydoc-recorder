@@ -39,10 +39,17 @@ data class ConspectState(
     val attempts: Int,
 )
 
+data class SubjectSummary(
+    val id: String,
+    val name: String,
+    val count: Int = 0,
+)
+
 data class ConspectSummary(
     val sessionId: String,
     val title: String,
     val subject: String = "",
+    val subjectId: String = "",
     val preview: String,
     val completedAt: String,
     val length: Int,
@@ -53,6 +60,36 @@ data class AudioSourceChunk(
     val url: String,
     val durationMs: Long,
     val mimeType: String,
+)
+
+data class LectureCitation(
+    val index: Int,
+    val chunkIndex: Int,
+    val startMs: Long,
+    val endMs: Long,
+    val time: String,
+    val text: String,
+)
+
+data class StudyQuestion(
+    val question: String,
+    val answer: String,
+)
+
+data class StudyKit(
+    val questions: List<StudyQuestion>,
+    val checklist: List<String>,
+    val cached: Boolean = false,
+)
+
+data class LectureAnswer(
+    val answer: String,
+    val citations: List<LectureCitation>,
+)
+
+data class QaHistoryTurn(
+    val role: String,
+    val text: String,
 )
 
 data class AudioSessionSource(
@@ -364,6 +401,95 @@ class ApiClient(context: Context) {
         }
     }
 
+    suspend fun listSubjects(): ApiResult<List<SubjectSummary>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/subjects")
+            .get()
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось получить предметы", response.code >= 500)
+            }
+            val array = json.optJSONArray("subjects") ?: JSONArray()
+            val values = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                SubjectSummary(
+                    id = item.optString("id"),
+                    name = item.optString("name"),
+                    count = item.optInt("count"),
+                )
+            }
+            ApiResult.Ok(values)
+        }
+    }
+
+    suspend fun createSubject(name: String): ApiResult<SubjectSummary> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/subjects")
+            .post(JSONObject().put("name", name).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val item = json?.optJSONObject("subject")
+            if (!response.isSuccessful || item == null) {
+                return@use ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось создать предмет" }, false)
+            }
+            ApiResult.Ok(SubjectSummary(item.optString("id"), item.optString("name"), item.optInt("count")))
+        }
+    }
+
+    suspend fun renameSubject(id: String, name: String): ApiResult<SubjectSummary> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/subjects")
+            .patch(JSONObject().put("id", id).put("name", name).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val item = json?.optJSONObject("subject")
+            if (!response.isSuccessful || item == null) {
+                return@use ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось переименовать предмет" }, false)
+            }
+            ApiResult.Ok(SubjectSummary(item.optString("id"), item.optString("name"), item.optInt("count")))
+        }
+    }
+
+    suspend fun deleteSubject(id: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/subjects")
+            .delete(JSONObject().put("id", id).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", "Не удалось удалить предмет", false)
+        }
+    }
+
+    suspend fun assignSubject(sessionId: String, subjectId: String?, name: String?): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("sessionId", sessionId)
+        if (!subjectId.isNullOrBlank()) payload.put("subjectId", subjectId)
+        if (!name.isNullOrBlank()) payload.put("name", name)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/subject")
+            .post(payload.toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", "Не удалось назначить предмет", false)
+        }
+    }
+
     suspend fun listConspects(): ApiResult<List<ConspectSummary>> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val request = Request.Builder()
@@ -389,6 +515,7 @@ class ApiClient(context: Context) {
                     sessionId = item.optString("sessionId"),
                     title = item.optString("title").ifBlank { "Конспект лекции" },
                     subject = item.optString("subject"),
+                    subjectId = item.optString("subjectId"),
                     preview = item.optString("preview"),
                     completedAt = item.optString("completedAt"),
                     length = item.optInt("length"),
@@ -434,6 +561,92 @@ class ApiClient(context: Context) {
                 destination.length() > 0L
             }
         }.getOrDefault(false)
+    }
+
+    suspend fun studyKit(sessionId: String, refresh: Boolean = false): ApiResult<StudyKit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("sessionId", sessionId).put("refresh", refresh).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/study-kit")
+            .post(payload.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось подготовить вопросы" },
+                    retryable = response.code >= 500,
+                )
+            }
+            val qArray = json.optJSONArray("questions") ?: JSONArray()
+            val questions = (0 until qArray.length()).mapNotNull { index ->
+                val item = qArray.optJSONObject(index) ?: return@mapNotNull null
+                val question = item.optString("question").trim()
+                val answer = item.optString("answer").trim()
+                if (question.isBlank() || answer.isBlank()) null else StudyQuestion(question, answer)
+            }
+            val cArray = json.optJSONArray("checklist") ?: JSONArray()
+            val checklist = (0 until cArray.length()).mapNotNull { index ->
+                cArray.optString(index).trim().takeIf { it.isNotBlank() }
+            }
+            ApiResult.Ok(StudyKit(questions, checklist, json.optBoolean("cached")))
+        }
+    }
+
+    suspend fun askLecture(
+        sessionId: String,
+        question: String,
+        history: List<QaHistoryTurn>,
+    ): ApiResult<LectureAnswer> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val historyArray = JSONArray()
+        history.takeLast(6).forEach { turn ->
+            historyArray.put(JSONObject().put("role", turn.role).put("text", turn.text))
+        }
+        val payload = JSONObject()
+            .put("sessionId", sessionId)
+            .put("question", question)
+            .put("history", historyArray)
+            .toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/ask")
+            .post(payload.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось получить ответ" },
+                    retryable = response.code >= 500,
+                )
+            }
+            val array = json.optJSONArray("citations") ?: JSONArray()
+            val citations = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                LectureCitation(
+                    index = item.optInt("index"),
+                    chunkIndex = item.optInt("chunkIndex"),
+                    startMs = item.optLong("startMs"),
+                    endMs = item.optLong("endMs"),
+                    time = item.optString("time"),
+                    text = item.optString("text"),
+                )
+            }
+            ApiResult.Ok(
+                LectureAnswer(
+                    answer = json.optString("answer"),
+                    citations = citations,
+                ),
+            )
+        }
     }
 
     suspend fun audioSession(sessionId: String): ApiResult<AudioSessionSource> = withContext(Dispatchers.IO) {
