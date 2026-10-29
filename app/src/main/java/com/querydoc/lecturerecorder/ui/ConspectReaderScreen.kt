@@ -342,7 +342,12 @@ fun ConspectReaderScreen(
                 onPause = onPause,
                 onStop = onStop,
                 onSeek = onSeek,
-                onBackToQuestions = { tab = 3 },
+                onBackToQuestions = {
+                    if (playerState.currentPlaybackItemId == sessionId) {
+                        onPause(sessionId)
+                    }
+                    tab = 3
+                },
             )
         } else {
             LectureQaContent(
