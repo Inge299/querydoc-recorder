@@ -191,28 +191,40 @@ fun ConspectsScreen(
                 onRefresh = { reload += 1 },
             )
 
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                items(items, key = { it.sessionId }) { item ->
-                    ConspectRow(
-                        item = item,
-                        hasLocalCopy = item.sessionId in cachedIds,
-                        onClick = { onOpen(item) },
-                        onRemoveLocal = {
-                            ConspectCache.remove(context, item.sessionId)
-                            cachedIds = cachedIds - item.sessionId
-                            if (offline) items = items.filterNot { it.sessionId == item.sessionId }
-                            Toast.makeText(context, "Копия удалена с устройства", Toast.LENGTH_SHORT).show()
-                        },
-                        onDeleteRemote = { deleteTarget = item },
-                    )
+            else -> {
+                val subjectGroups = items
+                    .groupBy { it.subject.trim().ifBlank { "Без предмета" } }
+                    .entries
+                    .sortedWith(compareBy({ it.key == "Без предмета" }, { it.key }))
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    subjectGroups.forEach { (subject, rows) ->
+                        item(key = "subject_$subject") {
+                            SubjectHeader(subject = subject, count = rows.size)
+                        }
+                        items(rows, key = { it.sessionId }) { item ->
+                            ConspectRow(
+                                item = item,
+                                hasLocalCopy = item.sessionId in cachedIds,
+                                onClick = { onOpen(item) },
+                                onRemoveLocal = {
+                                    ConspectCache.remove(context, item.sessionId)
+                                    cachedIds = cachedIds - item.sessionId
+                                    if (offline) items = items.filterNot { it.sessionId == item.sessionId }
+                                    Toast.makeText(context, "Копия удалена с устройства", Toast.LENGTH_SHORT).show()
+                                },
+                                onDeleteRemote = { deleteTarget = item },
+                            )
+                        }
+                    }
                 }
             }
         }
     }
+
 
     deleteTarget?.let { target ->
         AlertDialog(
@@ -263,6 +275,30 @@ private fun formatConspectDate(value: String): String {
             .withZone(ZoneId.systemDefault())
             .format(instant)
     }.getOrElse { value.take(10) }
+}
+
+@Composable
+private fun SubjectHeader(subject: String, count: Int) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 6.dp, end = 6.dp, top = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = subject.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF64748B),
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.8.sp,
+        )
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF94A3B8),
+        )
+    }
 }
 
 @Composable

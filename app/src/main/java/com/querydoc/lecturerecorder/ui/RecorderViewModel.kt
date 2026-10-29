@@ -337,22 +337,32 @@ class RecorderViewModel(
     private fun observeQueue() {
         viewModelScope.launch {
             dao.observeAudioItems().collect { queueItems ->
-                val grouped = queueItems.groupBy { parseMetadataValue(it.metadataJson, "sessionId") ?: "legacy_${it.id}" }
-                val records = grouped.values
-                    .map { buildRecordingSession(it) }
-                    .sortedByDescending { it.sortKey }
-                    .map { it.item }
-                recordingsById = records.associateBy { it.id }
-                _state.update {
-                    val current = it.currentPlaybackItemId
-                    val safeCurrent = if (current != null && records.any { row -> row.id == current }) current else null
-                    it.copy(
-                        recordings = records,
-                        canPlayLocalAudio = records.isNotEmpty(),
-                        currentPlaybackItemId = safeCurrent
-                    )
-                }
+                updateRecordings(queueItems)
             }
+        }
+    }
+
+    fun refreshRecordings() {
+        viewModelScope.launch {
+            updateRecordings(dao.allAudioItems())
+        }
+    }
+
+    private fun updateRecordings(queueItems: List<UploadQueueEntity>) {
+        val grouped = queueItems.groupBy { parseMetadataValue(it.metadataJson, "sessionId") ?: "legacy_${it.id}" }
+        val records = grouped.values
+            .map { buildRecordingSession(it) }
+            .sortedByDescending { it.sortKey }
+            .map { it.item }
+        recordingsById = records.associateBy { it.id }
+        _state.update {
+            val current = it.currentPlaybackItemId
+            val safeCurrent = if (current != null && records.any { row -> row.id == current }) current else null
+            it.copy(
+                recordings = records,
+                canPlayLocalAudio = records.isNotEmpty(),
+                currentPlaybackItemId = safeCurrent
+            )
         }
     }
 
@@ -540,8 +550,16 @@ class RecorderViewModel(
         val chunkPaths = sorted.map { it.filePath }
         val chunkDurations = chunkPaths.map { resolveDuration(it) }
         val totalDuration = chunkDurations.sum().coerceAtLeast(1_000L)
+        val sessionId = parseMetadataValue(sorted.firstOrNull()?.metadataJson, "sessionId") ?: sorted.first().id
+        val uploadStatus = mergeStatus(sorted.map { it.status })
+        val stage = when {
+            uploadStatus == UploadStatus.FAILED -> RecordingStage.FAILED
+            uploadStatus == UploadStatus.UPLOADED && ConspectCache.get(app, sessionId) != null -> RecordingStage.RECOGNIZED
+            uploadStatus == UploadStatus.UPLOADED -> RecordingStage.CLOUD
+            else -> RecordingStage.LOCAL
+        }
         val item = RecordingListItem(
-            id = parseMetadataValue(sorted.firstOrNull()?.metadataJson, "sessionId") ?: sorted.first().id,
+            id = sessionId,
             title = "Запись",
             filePath = sorted.first().filePath,
             chunkPaths = chunkPaths,
@@ -549,7 +567,8 @@ class RecorderViewModel(
             durationMs = totalDuration,
             createdAtLabel = dateFormatter.format(Date(createdAt)),
             durationLabel = formatDuration(totalDuration),
-            status = mergeStatus(sorted.map { it.status }),
+            status = uploadStatus,
+            stage = stage,
             statusLabel = "",
             deleteAfterLabel = ""
         )

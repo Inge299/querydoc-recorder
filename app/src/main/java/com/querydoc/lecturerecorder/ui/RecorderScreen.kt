@@ -78,6 +78,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.querydoc.lecturerecorder.config.AppConfig
 import com.querydoc.lecturerecorder.data.local.UploadStatus
@@ -388,6 +389,9 @@ fun RecorderScreen(
                     }
                 } else {
                     val listTapInteraction = remember { MutableInteractionSource() }
+                    val stageGroups = RecordingStage.entries
+                        .map { stage -> stage to uiState.recordings.filter { it.stage == stage } }
+                        .filter { it.second.isNotEmpty() }
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -402,7 +406,11 @@ fun RecorderScreen(
                         state = listState,
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        items(uiState.recordings, key = { it.id }) { item ->
+                        stageGroups.forEach { (stage, rows) ->
+                            item(key = "stage_${stage.name}") {
+                                HistoryStageHeader(stage = stage, count = rows.size)
+                            }
+                            items(rows, key = { it.id }) { item ->
                             val isCurrent = item.id == uiState.currentPlaybackItemId
                             val isFocused = isCurrent || focusedItemId == item.id || lingeringItemId == item.id
                             val progress = if (isCurrent) {
@@ -441,6 +449,7 @@ fun RecorderScreen(
                                 },
                                 onRequestConspect = onRequestConspect
                             )
+                            }
                         }
                     }
                 }
@@ -471,6 +480,37 @@ fun RecorderScreen(
             confirmButton = {
                 TextButton(onClick = onDismissConspect) { Text("Закрыть") }
             },
+        )
+    }
+}
+
+@Composable
+private fun HistoryStageHeader(stage: RecordingStage, count: Int) {
+    val color = when (stage) {
+        RecordingStage.LOCAL -> Color(0xFFF59E0B)
+        RecordingStage.CLOUD -> Color(0xFF0284C7)
+        RecordingStage.RECOGNIZED -> Color(0xFF16A34A)
+        RecordingStage.FAILED -> Color(0xFFDC2626)
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 4.dp, end = 4.dp, top = 6.dp, bottom = 1.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Box(modifier = Modifier.size(7.dp).background(color, CircleShape))
+        Text(
+            text = stage.label.uppercase(),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF64748B),
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = 0.7.sp,
+        )
+        Text(
+            text = count.toString(),
+            style = MaterialTheme.typography.labelSmall,
+            color = Color(0xFF94A3B8),
         )
     }
 }

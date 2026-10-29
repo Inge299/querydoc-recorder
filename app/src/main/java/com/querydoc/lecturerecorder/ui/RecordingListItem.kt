@@ -12,6 +12,7 @@ data class RecordingListItem(
     val createdAtLabel: String,
     val durationLabel: String,
     val status: UploadStatus,
+    val stage: RecordingStage,
     val statusLabel: String,
     val deleteAfterLabel: String
 )

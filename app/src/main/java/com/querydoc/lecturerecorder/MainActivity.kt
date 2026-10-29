@@ -119,6 +119,11 @@ class MainActivity : ComponentActivity() {
             BackHandler(enabled = readerSession == null && showConspects) {
                 showConspects = false
             }
+            LaunchedEffect(showSettings, showConspects, readerSession) {
+                if (!showSettings && !showConspects && readerSession == null) {
+                    viewModel.refreshRecordings()
+                }
+            }
             LaunchedEffect(screen) {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.isAppearanceLightStatusBars = screen != "intro"
@@ -188,6 +193,11 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        viewModel.refreshRecordings()
     }
 
     override fun onNewIntent(intent: Intent) {
