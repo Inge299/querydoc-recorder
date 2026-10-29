@@ -348,6 +348,7 @@ fun ConspectReaderScreen(
                 playerState = playerState,
                 messages = qaMessages,
                 onMessagesChange = { qaMessages = it },
+                modifier = Modifier.weight(1f).fillMaxWidth(),
                 onOpenCitation = { citation ->
                     val recording = playerState.recordings.firstOrNull { it.id == sessionId }
                     val total = recording?.durationMs?.coerceAtLeast(1L) ?: 1L
@@ -377,6 +378,7 @@ private fun LectureQaContent(
     playerState: RecorderUiState,
     messages: List<QaMessage>,
     onMessagesChange: (List<QaMessage>) -> Unit,
+    modifier: Modifier = Modifier,
     onOpenCitation: (LectureCitation) -> Unit,
 ) {
     var input by remember(sessionId) { mutableStateOf("") }
@@ -412,10 +414,10 @@ private fun LectureQaContent(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize().imePadding()) {
+    Box(modifier = modifier.fillMaxSize().imePadding()) {
         LazyColumn(
             state = listState,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.fillMaxSize().padding(bottom = 76.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -514,7 +516,11 @@ private fun LectureQaContent(
         }
 
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color(0xFFF4F6FB))
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -523,7 +529,7 @@ private fun LectureQaContent(
                 onValueChange = { input = it.take(2_000) },
                 modifier = Modifier.weight(1f),
                 placeholder = { Text("Вопрос по лекции…") },
-                maxLines = 4,
+                maxLines = 3,
             )
             IconButton(
                 onClick = { send(input) },
