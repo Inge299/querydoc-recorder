@@ -110,6 +110,7 @@ fun ConspectReaderScreen(
     var transcriptError by remember { mutableStateOf("") }
     var transcriptReload by remember { mutableStateOf(0) }
     var showStudyKit by remember { mutableStateOf(false) }
+    var qaMessages by remember(sessionId) { mutableStateOf(listOf<QaMessage>()) }
 
     LaunchedEffect(reload) {
         val cached = ConspectCache.get(context, sessionId)
@@ -338,12 +339,15 @@ fun ConspectReaderScreen(
                 onPause = onPause,
                 onStop = onStop,
                 onSeek = onSeek,
+                onBackToQuestions = { tab = 3 },
             )
         } else {
             LectureQaContent(
                 api = api,
                 sessionId = sessionId,
                 playerState = playerState,
+                messages = qaMessages,
+                onMessagesChange = { qaMessages = it },
                 onOpenCitation = { citation ->
                     val recording = playerState.recordings.firstOrNull { it.id == sessionId }
                     val total = recording?.durationMs?.coerceAtLeast(1L) ?: 1L
@@ -371,9 +375,10 @@ private fun LectureQaContent(
     api: ApiClient,
     sessionId: String,
     playerState: RecorderUiState,
+    messages: List<QaMessage>,
+    onMessagesChange: (List<QaMessage>) -> Unit,
     onOpenCitation: (LectureCitation) -> Unit,
 ) {
-    var messages by remember(sessionId) { mutableStateOf(listOf<QaMessage>()) }
     var input by remember(sessionId) { mutableStateOf("") }
     var loading by remember(sessionId) { mutableStateOf(false) }
     var error by remember(sessionId) { mutableStateOf("") }
@@ -384,14 +389,14 @@ private fun LectureQaContent(
         val trimmed = question.trim()
         if (trimmed.isBlank() || loading) return
         val history = messages.map { QaHistoryTurn(it.role, it.text) }
-        messages = messages + QaMessage("user", trimmed)
+        onMessagesChange(messages + QaMessage("user", trimmed))
         input = ""
         error = ""
         loading = true
         scope.launch {
             when (val result = api.askLecture(sessionId, trimmed, history)) {
                 is ApiResult.Ok -> {
-                    messages = messages + QaMessage("assistant", result.value.answer, result.value.citations)
+                    onMessagesChange(messages + QaMessage("assistant", result.value.answer, result.value.citations))
                 }
                 is ApiResult.Failure -> {
                     error = result.message
@@ -467,18 +472,26 @@ private fun LectureQaContent(
                                     color = Color.White,
                                 )
                             } else {
-                                ConspectMarkdown(message.text)
-                            }
-                            message.citations.forEach { citation ->
-                                TextButton(
-                                    onClick = { onOpenCitation(citation) },
-                                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                                ) {
-                                    Text(
-                                        "[${citation.index}] ${citation.time} · перейти",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = if (isUser) Color(0xFFE0E7FF) else Color(0xFF4338CA),
-                                    )
+                                val hasInline = Regex("\\[\\d+]").containsMatchIn(message.text)
+                                ConspectMarkdown(
+                                    markdown = message.text,
+                                    onCitationClick = { index ->
+                                        message.citations.firstOrNull { it.index == index }?.let(onOpenCitation)
+                                    },
+                                )
+                                if (!hasInline) {
+                                    message.citations.forEach { citation ->
+                                        TextButton(
+                                            onClick = { onOpenCitation(citation) },
+                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                                        ) {
+                                            Text(
+                                                "[${citation.index}] ${citation.time} · перейти",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = Color(0xFF4338CA),
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -531,6 +544,7 @@ private fun AudioTabContent(
     onPause: (String) -> Unit,
     onStop: (String) -> Unit,
     onSeek: (String, Float) -> Unit,
+    onBackToQuestions: () -> Unit,
 ) {
     val recording = playerState.recordings.firstOrNull { it.id == sessionId }
     val isCurrent = playerState.currentPlaybackItemId == sessionId
@@ -550,6 +564,7 @@ private fun AudioTabContent(
     var bookmarks by remember(sessionId) { mutableStateOf(BookmarkStore.list(context, sessionId)) }
     var showBookmarkDialog by remember { mutableStateOf(false) }
     var bookmarkLabel by remember { mutableStateOf("") }
+    var deleteBookmarkTarget by remember { mutableStateOf<AudioBookmark?>(null) }
     val bookmarkPositionMs = if (isCurrent) positionMs else (totalMs * sliderValue).toLong()
 
     Column(
@@ -612,7 +627,7 @@ private fun AudioTabContent(
                 }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.Center,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterHorizontally),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
@@ -662,6 +677,10 @@ private fun AudioTabContent(
             }
         }
 
+        TextButton(onClick = onBackToQuestions) {
+            Text("← К вопросам по лекции", color = Color(0xFF4338CA))
+        }
+
         TextButton(
             onClick = {
                 bookmarkLabel = ""
@@ -704,10 +723,7 @@ private fun AudioTabContent(
                                 Text(formatAudioTime(bookmark.positionMs), style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
                             }
                             IconButton(
-                                onClick = {
-                                    BookmarkStore.remove(context, sessionId, bookmark.id)
-                                    bookmarks = BookmarkStore.list(context, sessionId)
-                                },
+                                onClick = { deleteBookmarkTarget = bookmark },
                                 modifier = Modifier.size(34.dp),
                             ) {
                                 Icon(Icons.Filled.Delete, contentDescription = "Удалить закладку", tint = Color(0xFF94A3B8), modifier = Modifier.size(17.dp))
@@ -743,6 +759,24 @@ private fun AudioTabContent(
             },
             dismissButton = {
                 TextButton(onClick = { showBookmarkDialog = false }) { Text("Отмена") }
+            },
+        )
+    }
+
+    deleteBookmarkTarget?.let { bookmark ->
+        AlertDialog(
+            onDismissRequest = { deleteBookmarkTarget = null },
+            title = { Text("Удалить закладку?") },
+            text = { Text("«${bookmark.label}» · ${formatAudioTime(bookmark.positionMs)}") },
+            confirmButton = {
+                TextButton(onClick = {
+                    BookmarkStore.remove(context, sessionId, bookmark.id)
+                    bookmarks = BookmarkStore.list(context, sessionId)
+                    deleteBookmarkTarget = null
+                }) { Text("Удалить", color = Color(0xFFDC2626)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteBookmarkTarget = null }) { Text("Отмена") }
             },
         )
     }
