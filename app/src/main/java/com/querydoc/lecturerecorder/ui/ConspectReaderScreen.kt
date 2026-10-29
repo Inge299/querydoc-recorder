@@ -36,7 +36,9 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -344,6 +346,21 @@ private fun AudioTabContent(
                             color = Color(0xFF64748B),
                         )
                     }
+                }
+                val downloading = playerState.audioDownloadSessionId == sessionId && playerState.audioDownloadActive
+                if (downloading) {
+                    val total = playerState.audioDownloadTotal.coerceAtLeast(1)
+                    val fraction = (playerState.audioDownloadCompleted.toFloat() / total.toFloat()).coerceIn(0f, 1f)
+                    LinearProgressIndicator(
+                        progress = { fraction },
+                        modifier = Modifier.fillMaxWidth().padding(top = 14.dp),
+                    )
+                    Text(
+                        text = "Сохраняем для офлайна: ${playerState.audioDownloadCompleted} из ${playerState.audioDownloadTotal}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF64748B),
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
                 }
                 Spacer(Modifier.height(18.dp))
                 Slider(

@@ -60,12 +60,14 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateMapOf
@@ -86,6 +88,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.Instant
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.querydoc.lecturerecorder.config.AppConfig
 import com.querydoc.lecturerecorder.data.local.UploadStatus
@@ -586,6 +590,17 @@ private fun RecordingItemRow(
 ) {
     val safeDuration = playbackDurationMs.coerceAtLeast(1L)
     var sliderState by remember(progress, safeDuration) { mutableFloatStateOf(progress.coerceIn(0f, 1f)) }
+    val isRecognizing = item.conspectStatus == "queued" || item.conspectStatus == "running"
+    var clockMs by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val recognitionCreatedMs = remember(item.conspectCreatedAt) {
+        runCatching { Instant.parse(item.conspectCreatedAt).toEpochMilli() }.getOrDefault(0L)
+    }
+    LaunchedEffect(isRecognizing, recognitionCreatedMs) {
+        while (isRecognizing) {
+            clockMs = System.currentTimeMillis()
+            delay(1_000L)
+        }
+    }
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -617,9 +632,9 @@ private fun RecordingItemRow(
                         maxLines = 1
                     )
                     Text(
-                        text = stageHint(item.stage),
+                        text = itemHint(item),
                         style = MaterialTheme.typography.labelSmall,
-                        color = stageColor(item.stage),
+                        color = hintColor(item),
                         fontWeight = FontWeight.Medium,
                         maxLines = 1,
                     )
@@ -633,6 +648,42 @@ private fun RecordingItemRow(
                     style = MaterialTheme.typography.labelMedium,
                     color = Color(0xFF475569)
                 )
+            }
+            val uploadFraction = if (item.totalChunks > 0) {
+                item.uploadedChunks.toFloat() / item.totalChunks.toFloat()
+            } else 0f
+            when {
+                item.uploadedChunks < item.totalChunks && item.status != UploadStatus.FAILED -> {
+                    LinearProgressIndicator(
+                        progress = { uploadFraction.coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+                    )
+                    Text(
+                        text = "Загрузка в облако: ${item.uploadedChunks} из ${item.totalChunks}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF0284C7),
+                    )
+                }
+                item.conspectStatus == "queued" || item.conspectStatus == "running" -> {
+                    LinearProgressIndicator(
+                        modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
+                    )
+                    val elapsed = if (recognitionCreatedMs > 0L) {
+                        " · ${formatElapsed(clockMs - recognitionCreatedMs)}"
+                    } else ""
+                    Text(
+                        text = if (item.conspectStatus == "queued") "В очереди на распознавание$elapsed" else "Распознаётся…$elapsed",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF7C3AED),
+                    )
+                }
+                item.conspectStatus == "failed" -> {
+                    Text(
+                        text = "Не удалось распознать — попробуйте ещё раз",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFDC2626),
+                    )
+                }
             }
             if (isFocused) {
                 if (isRecordingNow) {
@@ -756,6 +807,28 @@ private fun stageColor(stage: RecordingStage): Color = when (stage) {
     RecordingStage.CLOUD -> Color(0xFF0284C7)
     RecordingStage.RECOGNIZED -> Color(0xFF16A34A)
     RecordingStage.FAILED -> Color(0xFFDC2626)
+}
+
+private fun formatElapsed(ms: Long): String {
+    val total = (ms / 1_000L).coerceAtLeast(0L)
+    val minutes = total / 60L
+    val seconds = total % 60L
+    return if (minutes > 0) "%d:%02d".format(minutes, seconds) else "0:%02d".format(seconds)
+}
+
+private fun itemHint(item: RecordingListItem): String = when {
+    item.uploadedChunks < item.totalChunks && item.status != UploadStatus.FAILED -> "Загрузка в облако"
+    item.conspectStatus == "queued" -> "В очереди на распознавание"
+    item.conspectStatus == "running" -> "Распознаётся…"
+    item.conspectStatus == "failed" -> "Ошибка распознавания"
+    else -> stageHint(item.stage)
+}
+
+private fun hintColor(item: RecordingListItem): Color = when {
+    item.conspectStatus == "failed" -> Color(0xFFDC2626)
+    item.conspectStatus == "queued" || item.conspectStatus == "running" -> Color(0xFF7C3AED)
+    item.uploadedChunks < item.totalChunks && item.status != UploadStatus.FAILED -> Color(0xFF0284C7)
+    else -> stageColor(item.stage)
 }
 
 private fun stageHint(stage: RecordingStage): String = when (stage) {

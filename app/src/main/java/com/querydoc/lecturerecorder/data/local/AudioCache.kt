@@ -48,12 +48,14 @@ object AudioCache {
         sessionId: String,
         chunks: List<AudioSourceChunk>,
         download: suspend (url: String, destination: File) -> Boolean,
+        onProgress: (completed: Int, total: Int) -> Unit = { _, _ -> },
     ): CachedAudio? {
         if (chunks.isEmpty()) return null
         clear(context, sessionId)
         val dir = sessionDir(context, sessionId)
         if (!dir.mkdirs()) return null
         val lines = mutableListOf<String>()
+        onProgress(0, chunks.size)
         for ((index, chunk) in chunks.withIndex()) {
             val file = File(dir, String.format("chunk_%04d.m4a", index))
             if (!download(chunk.url, file)) {
@@ -61,6 +63,7 @@ object AudioCache {
                 return null
             }
             lines += "${index}\t${chunk.durationMs.coerceAtLeast(1_000L)}\t${file.name}"
+            onProgress(index + 1, chunks.size)
         }
         File(dir, MANIFEST).writeText(lines.joinToString("\n"))
         return get(context, sessionId)

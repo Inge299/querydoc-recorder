@@ -13,6 +13,10 @@ data class RecordingListItem(
     val durationLabel: String,
     val status: UploadStatus,
     val stage: RecordingStage,
+    val uploadedChunks: Int,
+    val totalChunks: Int,
+    val conspectStatus: String,
+    val conspectCreatedAt: String,
     val statusLabel: String,
     val deleteAfterLabel: String
 )

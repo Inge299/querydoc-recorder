@@ -74,6 +74,9 @@ data class SessionProgress(
     val uploadPct: Int,
     val missingChunks: Int,
     val aggregateStatus: String?,
+    val conspectStatus: String,
+    val conspectCreatedAt: String,
+    val conspectUpdatedAt: String,
 )
 
 class ApiClient(context: Context) {
@@ -291,6 +294,9 @@ class ApiClient(context: Context) {
                     uploadPct = item.optInt("uploadPct"),
                     missingChunks = item.optInt("missingChunks"),
                     aggregateStatus = item.optString("aggregateStatus").takeIf { it.isNotBlank() },
+                    conspectStatus = item.optString("conspectStatus"),
+                    conspectCreatedAt = item.optString("conspectCreatedAt"),
+                    conspectUpdatedAt = item.optString("conspectUpdatedAt"),
                 )
             }
             ApiResult.Ok(values)

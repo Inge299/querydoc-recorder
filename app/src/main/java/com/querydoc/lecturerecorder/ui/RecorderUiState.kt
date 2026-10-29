@@ -26,6 +26,10 @@ data class RecorderUiState(
     val playbackPositionMs: Long = 0L,
     val playbackDurationMs: Long = 0L,
     val playbackStatus: String = "",
+    val audioDownloadSessionId: String? = null,
+    val audioDownloadCompleted: Int = 0,
+    val audioDownloadTotal: Int = 0,
+    val audioDownloadActive: Boolean = false,
     val recordings: List<RecordingListItem> = emptyList(),
     val conspectDialog: ConspectState? = null
 )

@@ -68,6 +68,9 @@ class RecorderViewModel(
     val state: StateFlow<RecorderUiState> = _state.asStateFlow()
 
     private var recordingsById: Map<String, RecordingListItem> = emptyMap()
+    private var serverConspectDetails: Map<String, com.querydoc.lecturerecorder.data.remote.SessionProgress>? = null
+    private val audioCacheJobs = mutableMapOf<String, Job>()
+    private var statusRefreshJob: Job? = null
     private var elapsedJob: Job? = null
     private var storageJob: Job? = null
     private var recordingStartedAtMs = 0L
@@ -311,21 +314,14 @@ class RecorderViewModel(
                     _state.update { it.copy(playbackStatus = "Аудио недоступно") }
                     null
                 } else {
-                    val downloaded = AudioCache.store(app, item.id, result.value.chunks) { url, file ->
-                        api.downloadAudio(url, file)
-                    }
-                    if (downloaded == null) {
-                        _state.update { it.copy(playbackStatus = "Не удалось скачать аудио") }
-                        null
-                    } else {
-                        val remote = item.copy(
-                            chunkPaths = downloaded.paths,
-                            chunkDurationsMs = downloaded.durationsMs,
-                        )
-                        recordingsById = recordingsById + (item.id to remote)
-                        _state.update { it.copy(playbackStatus = "") }
-                        remote
-                    }
+                    val remote = item.copy(
+                        chunkPaths = result.value.chunks.map { it.url },
+                        chunkDurationsMs = result.value.chunks.map { it.durationMs.coerceAtLeast(1_000L) },
+                    )
+                    recordingsById = recordingsById + (item.id to remote)
+                    startAudioCache(item.id, result.value.chunks)
+                    _state.update { it.copy(playbackStatus = "Стримим из облака…") }
+                    remote
                 }
             }
             is ApiResult.Failure -> {
@@ -389,7 +385,32 @@ class RecorderViewModel(
 
     fun refreshRecordings() {
         viewModelScope.launch {
-            updateRecordings(dao.allAudioItems())
+            val items = dao.allAudioItems()
+            updateRecordings(items)
+            val sessionIds = items.mapNotNull { item ->
+                parseMetadataValue(item.metadataJson, "sessionId")
+            }.distinct().take(100)
+            if (sessionIds.isEmpty()) return@launch
+            when (val statuses = api.status(sessionIds)) {
+                is ApiResult.Ok -> {
+                    serverConspectDetails = statuses.value.associateBy { it.sessionId }
+                    updateRecordings(items)
+                    val hasPending = statuses.value.any {
+                        it.conspectStatus == "queued" || it.conspectStatus == "running" ||
+                            it.uploadedChunks < it.totalChunks
+                    }
+                    if (hasPending) scheduleStatusRefresh()
+                }
+                is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
+    private fun scheduleStatusRefresh() {
+        statusRefreshJob?.cancel()
+        statusRefreshJob = viewModelScope.launch {
+            delay(10_000L)
+            refreshRecordings()
         }
     }
 
@@ -465,6 +486,41 @@ class RecorderViewModel(
         val freeBytes = app.filesDir.usableSpace
         val bytesPerSecond = (AppConfig.Audio.bitRateBps / 8L).coerceAtLeast(1L)
         return (freeBytes / bytesPerSecond).coerceAtLeast(0L)
+    }
+
+    private fun startAudioCache(sessionId: String, chunks: List<com.querydoc.lecturerecorder.data.remote.AudioSourceChunk>) {
+        if (audioCacheJobs[sessionId]?.isActive == true) return
+        _state.update {
+            it.copy(
+                audioDownloadSessionId = sessionId,
+                audioDownloadCompleted = 0,
+                audioDownloadTotal = chunks.size,
+                audioDownloadActive = true,
+            )
+        }
+        audioCacheJobs[sessionId] = viewModelScope.launch(Dispatchers.IO) {
+            val cached = AudioCache.store(app, sessionId, chunks, download = { url, file ->
+                api.downloadAudio(url, file)
+            }, onProgress = { completed, total ->
+                _state.update {
+                    it.copy(
+                        audioDownloadSessionId = sessionId,
+                        audioDownloadCompleted = completed,
+                        audioDownloadTotal = total,
+                        audioDownloadActive = true,
+                    )
+                }
+            })
+            _state.update {
+                it.copy(
+                    audioDownloadSessionId = sessionId,
+                    audioDownloadCompleted = if (cached != null) chunks.size else it.audioDownloadCompleted,
+                    audioDownloadTotal = chunks.size,
+                    audioDownloadActive = false,
+                    playbackStatus = if (it.currentPlaybackItemId == sessionId) "" else it.playbackStatus,
+                )
+            }
+        }
     }
 
     private suspend fun startPlayback(item: RecordingListItem, fraction: Float) {
@@ -598,9 +654,16 @@ class RecorderViewModel(
         val totalDuration = chunkDurations.sum().coerceAtLeast(1_000L)
         val sessionId = parseMetadataValue(sorted.firstOrNull()?.metadataJson, "sessionId") ?: sorted.first().id
         val uploadStatus = mergeStatus(sorted.map { it.status })
+        val conspectDetails = serverConspectDetails?.get(sessionId)
+        val conspectStatus = conspectDetails?.conspectStatus.orEmpty()
+        val recognized = if (serverConspectDetails != null) {
+            conspectStatus == "completed"
+        } else {
+            ConspectCache.get(app, sessionId) != null
+        }
         val stage = when {
             uploadStatus == UploadStatus.FAILED -> RecordingStage.FAILED
-            uploadStatus == UploadStatus.UPLOADED && ConspectCache.get(app, sessionId) != null -> RecordingStage.RECOGNIZED
+            uploadStatus == UploadStatus.UPLOADED && recognized -> RecordingStage.RECOGNIZED
             uploadStatus == UploadStatus.UPLOADED -> RecordingStage.CLOUD
             else -> RecordingStage.LOCAL
         }
@@ -615,6 +678,10 @@ class RecorderViewModel(
             durationLabel = formatDuration(totalDuration),
             status = uploadStatus,
             stage = stage,
+            uploadedChunks = sorted.count { it.status == UploadStatus.UPLOADED },
+            totalChunks = sorted.size,
+            conspectStatus = conspectStatus,
+            conspectCreatedAt = conspectDetails?.conspectCreatedAt.orEmpty(),
             statusLabel = "",
             deleteAfterLabel = ""
         )
