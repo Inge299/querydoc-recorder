@@ -13,6 +13,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectState
 import com.querydoc.lecturerecorder.config.AppConfig
 import com.querydoc.lecturerecorder.data.local.AudioCache
+import com.querydoc.lecturerecorder.data.local.PlaybackPositionStore
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.recording.AudioRecordingService
@@ -62,7 +63,8 @@ class RecorderViewModel(
             environmentProfile = initialEnvironmentProfile,
             recognitionLanguage = initialRecognitionLanguage,
             energySaverEnabled = AppConfig.Power.enableEnergySaverByDefault,
-            statusText = "Готово"
+            statusText = "Готово",
+            audioPositions = PlaybackPositionStore.load(app)
         )
     )
     val state: StateFlow<RecorderUiState> = _state.asStateFlow()
@@ -290,7 +292,12 @@ class RecorderViewModel(
         }
         viewModelScope.launch {
             val playable = preparePlayableItem(item)
-            if (playable != null) startPlayback(playable, startFraction ?: 0f)
+            if (playable != null) {
+                val savedFraction = state.value.audioPositions[id]?.let { position ->
+                    if (item.durationMs > 0L) (position.toFloat() / item.durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+                }
+                startPlayback(playable, startFraction ?: savedFraction ?: 0f)
+            }
         }
     }
 
@@ -336,12 +343,14 @@ class RecorderViewModel(
         val player = mediaPlayer ?: return
         if (!player.isPlaying) return
         player.pause()
+        savePlaybackPosition(id, state.value.playbackPositionMs)
         _state.update { it.copy(isPlayingLocalAudio = false, isPlaybackPaused = true) }
     }
 
     fun stopPlaybackForItem(id: String) {
         if (state.value.currentPlaybackItemId != id) return
-        stopPlaybackInternal(clearItem = false)
+        savePlaybackPosition(id, state.value.playbackPositionMs)
+        stopPlaybackInternal(clearItem = true)
         _state.update {
             it.copy(
                 isPlayingLocalAudio = false,
@@ -349,6 +358,23 @@ class RecorderViewModel(
                 playbackPositionMs = 0L
             )
         }
+    }
+
+    fun persistPlaybackPosition() {
+        val id = state.value.currentPlaybackItemId ?: return
+        val position = state.value.playbackPositionMs
+        if (position > 0L) savePlaybackPosition(id, position)
+    }
+
+    private fun savePlaybackPosition(sessionId: String, positionMs: Long) {
+        if (sessionId.isBlank() || positionMs <= 0L) return
+        PlaybackPositionStore.save(app, sessionId, positionMs)
+        _state.update { it.copy(audioPositions = it.audioPositions + (sessionId to positionMs)) }
+    }
+
+    private fun clearSavedPosition(sessionId: String) {
+        PlaybackPositionStore.clear(app, sessionId)
+        _state.update { it.copy(audioPositions = it.audioPositions - sessionId) }
     }
 
     fun seekPlaybackPosition(id: String, fraction: Float) {
@@ -537,6 +563,7 @@ class RecorderViewModel(
 
     private suspend fun playChunk(index: Int, seekMs: Long, totalMs: Long) {
         if (index >= playbackChunkPaths.size) {
+            playbackSessionId?.let { clearSavedPosition(it) }
             stopPlaybackInternal(clearItem = false)
             _state.update {
                 it.copy(
@@ -604,6 +631,7 @@ class RecorderViewModel(
     private fun startPlaybackProgressTicker(totalMs: Long) {
         playbackMonitorJob?.cancel()
         playbackMonitorJob = viewModelScope.launch {
+            var lastSavedBucket = -1L
             while (true) {
                 val player = mediaPlayer
                 if (player == null) {
@@ -613,6 +641,11 @@ class RecorderViewModel(
                 val inChunk = runCatching { player.currentPosition.toLong() }.getOrDefault(0L)
                 val absolute = (playbackBaseMs + inChunk).coerceIn(0L, totalMs)
                 _state.update { it.copy(playbackPositionMs = absolute) }
+                val bucket = absolute / 5_000L
+                if (bucket != lastSavedBucket) {
+                    lastSavedBucket = bucket
+                    playbackSessionId?.let { savePlaybackPosition(it, absolute) }
+                }
                 delay(120L)
             }
         }
@@ -748,6 +781,7 @@ class RecorderViewModel(
     }
 
     override fun onCleared() {
+        persistPlaybackPosition()
         super.onCleared()
         elapsedJob?.cancel()
         storageJob?.cancel()

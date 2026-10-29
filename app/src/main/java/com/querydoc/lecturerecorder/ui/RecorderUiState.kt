@@ -26,6 +26,7 @@ data class RecorderUiState(
     val playbackPositionMs: Long = 0L,
     val playbackDurationMs: Long = 0L,
     val playbackStatus: String = "",
+    val audioPositions: Map<String, Long> = emptyMap(),
     val audioDownloadSessionId: String? = null,
     val audioDownloadCompleted: Int = 0,
     val audioDownloadTotal: Int = 0,

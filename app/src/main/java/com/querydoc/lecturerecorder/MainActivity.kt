@@ -206,6 +206,11 @@ class MainActivity : ComponentActivity() {
         viewModel.refreshRecordings()
     }
 
+    override fun onStop() {
+        viewModel.persistPlaybackPosition()
+        super.onStop()
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)

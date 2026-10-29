@@ -23,14 +23,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -42,6 +48,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -59,6 +66,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
+import com.querydoc.lecturerecorder.data.local.BookmarkStore
+import com.querydoc.lecturerecorder.data.local.AudioBookmark
 import com.querydoc.lecturerecorder.work.ConspectCache
 
 @Composable
@@ -310,11 +319,16 @@ private fun AudioTabContent(
     val recording = playerState.recordings.firstOrNull { it.id == sessionId }
     val isCurrent = playerState.currentPlaybackItemId == sessionId
     val totalMs = if (isCurrent && playerState.playbackDurationMs > 0L) playerState.playbackDurationMs else (recording?.durationMs ?: 0L)
-    val positionMs = if (isCurrent) playerState.playbackPositionMs else 0L
+    val savedPositionMs = playerState.audioPositions[sessionId] ?: 0L
+    val positionMs = if (isCurrent) playerState.playbackPositionMs else savedPositionMs
     val progress = if (totalMs > 0L) (positionMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f) else 0f
     var sliderValue by remember(sessionId, progress, totalMs) { mutableFloatStateOf(progress) }
     val isPlaying = isCurrent && playerState.isPlayingLocalAudio
-    val isPaused = isCurrent && playerState.isPlaybackPaused
+    val context = LocalContext.current
+    var bookmarks by remember(sessionId) { mutableStateOf(BookmarkStore.list(context, sessionId)) }
+    var showBookmarkDialog by remember { mutableStateOf(false) }
+    var bookmarkLabel by remember { mutableStateOf("") }
+    val bookmarkPositionMs = if (isCurrent) positionMs else (totalMs * sliderValue).toLong()
 
     Column(
         modifier = Modifier
@@ -391,13 +405,14 @@ private fun AudioTabContent(
                             modifier = Modifier.size(28.dp),
                         )
                     }
-                    if (isCurrent) {
-                        IconButton(
-                            onClick = { onStop(sessionId) },
-                            modifier = Modifier.size(48.dp).padding(start = 8.dp),
-                        ) {
-                            Icon(Icons.Filled.Stop, contentDescription = "Стоп", tint = Color(0xFF64748B))
-                        }
+                    IconButton(
+                        onClick = {
+                            if (isCurrent) onSeek(sessionId, 0f) else onPlay(sessionId, 0f)
+                        },
+                        enabled = recording != null,
+                        modifier = Modifier.size(48.dp).padding(start = 8.dp),
+                    ) {
+                        Icon(Icons.Filled.Replay, contentDescription = "В начало", tint = Color(0xFF64748B))
                     }
                 }
                 if (playerState.playbackStatus.isNotBlank()) {
@@ -410,6 +425,90 @@ private fun AudioTabContent(
                 }
             }
         }
+
+        TextButton(
+            onClick = {
+                bookmarkLabel = ""
+                showBookmarkDialog = true
+            },
+            enabled = recording != null,
+        ) {
+            Icon(Icons.Filled.BookmarkBorder, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text(" Добавить закладку", color = Color(0xFF4338CA))
+        }
+
+        if (bookmarks.isNotEmpty()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                    Text(
+                        "Закладки",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = Color(0xFF64748B),
+                    )
+                    bookmarks.forEach { bookmark ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    val fraction = if (totalMs > 0L) (bookmark.positionMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f) else 0f
+                                    if (isCurrent) onSeek(sessionId, fraction) else onPlay(sessionId, fraction)
+                                },
+                                modifier = Modifier.size(34.dp),
+                            ) {
+                                Icon(Icons.Filled.PlayArrow, contentDescription = "Перейти к закладке", tint = Color(0xFF4338CA), modifier = Modifier.size(18.dp))
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(bookmark.label, style = MaterialTheme.typography.bodySmall, color = Color(0xFF0F172A), maxLines = 1)
+                                Text(formatAudioTime(bookmark.positionMs), style = MaterialTheme.typography.labelSmall, color = Color(0xFF64748B))
+                            }
+                            IconButton(
+                                onClick = {
+                                    BookmarkStore.remove(context, sessionId, bookmark.id)
+                                    bookmarks = BookmarkStore.list(context, sessionId)
+                                },
+                                modifier = Modifier.size(34.dp),
+                            ) {
+                                Icon(Icons.Filled.Delete, contentDescription = "Удалить закладку", tint = Color(0xFF94A3B8), modifier = Modifier.size(17.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showBookmarkDialog) {
+        AlertDialog(
+            onDismissRequest = { showBookmarkDialog = false },
+            title = { Text("Новая закладка") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Время: ${formatAudioTime(bookmarkPositionMs)}", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                    OutlinedTextField(
+                        value = bookmarkLabel,
+                        onValueChange = { bookmarkLabel = it },
+                        singleLine = true,
+                        label = { Text("Название (необязательно)") },
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    BookmarkStore.add(context, sessionId, bookmarkPositionMs, bookmarkLabel)
+                    bookmarks = BookmarkStore.list(context, sessionId)
+                    showBookmarkDialog = false
+                }) { Text("Добавить") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBookmarkDialog = false }) { Text("Отмена") }
+            },
+        )
     }
 }
 
