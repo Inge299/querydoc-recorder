@@ -8,6 +8,8 @@ import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -72,6 +74,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -474,27 +477,11 @@ private fun LectureQaContent(
                                     color = Color.White,
                                 )
                             } else {
-                                val hasInline = Regex("\\[\\d+]").containsMatchIn(message.text)
-                                ConspectMarkdown(
-                                    markdown = message.text,
-                                    onCitationClick = { index ->
-                                        message.citations.firstOrNull { it.index == index }?.let(onOpenCitation)
-                                    },
+                                QaAnswerText(
+                                    text = message.text,
+                                    citations = message.citations,
+                                    onOpenCitation = onOpenCitation,
                                 )
-                                if (!hasInline) {
-                                    message.citations.forEach { citation ->
-                                        TextButton(
-                                            onClick = { onOpenCitation(citation) },
-                                            contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
-                                        ) {
-                                            Text(
-                                                "[${citation.index}] ${citation.time} · перейти",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = Color(0xFF4338CA),
-                                            )
-                                        }
-                                    }
-                                }
                             }
                         }
                     }
@@ -537,6 +524,76 @@ private fun LectureQaContent(
                 modifier = Modifier.size(48.dp).background(Color(0xFF4338CA), RoundedCornerShape(24.dp)),
             ) {
                 Icon(Icons.Filled.Send, contentDescription = "Отправить", tint = Color.White)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun QaAnswerText(
+    text: String,
+    citations: List<LectureCitation>,
+    onOpenCitation: (LectureCitation) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        text.lines().forEach { rawLine ->
+            val line = rawLine.trimEnd()
+            if (line.isBlank()) {
+                Spacer(Modifier.height(2.dp))
+            } else {
+                val heading = line.startsWith("# ")
+                val bullet = line.startsWith("- ") || line.startsWith("* ")
+                val body = line
+                    .removePrefix("# ")
+                    .removePrefix("## ")
+                    .removePrefix("- ")
+                    .removePrefix("* ")
+                    .replace("**", "")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    if (bullet) {
+                        Text("•", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF4338CA))
+                    }
+                    FlowRow(
+                        modifier = Modifier.weight(1f),
+                        horizontalArrangement = Arrangement.Start,
+                    ) {
+                        val regex = Regex("\\[\\d+]")
+                        var cursor = 0
+                        regex.findAll(body).forEach { match ->
+                            if (match.range.first > cursor) {
+                                Text(
+                                    body.substring(cursor, match.range.first),
+                                    style = if (heading) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                                    fontWeight = if (heading) FontWeight.SemiBold else FontWeight.Normal,
+                                )
+                            }
+                            val index = match.value.removeSurrounding("[", "]").toIntOrNull()
+                            val citation = citations.firstOrNull { it.index == index }
+                            Text(
+                                text = match.value,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color(0xFF4338CA),
+                                textDecoration = TextDecoration.Underline,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.clickable(enabled = citation != null) {
+                                    citation?.let(onOpenCitation)
+                                },
+                            )
+                            cursor = match.range.last + 1
+                        }
+                        if (cursor < body.length) {
+                            Text(
+                                body.substring(cursor),
+                                style = if (heading) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium,
+                                fontWeight = if (heading) FontWeight.SemiBold else FontWeight.Normal,
+                            )
+                        }
+                    }
+                }
             }
         }
     }
