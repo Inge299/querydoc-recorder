@@ -14,6 +14,7 @@ import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.util.concurrent.TimeUnit
 
 sealed interface ApiResult<out T> {
@@ -46,6 +47,17 @@ data class ConspectSummary(
     val completedAt: String,
     val length: Int,
     val markdown: String? = null,
+)
+
+data class AudioSourceChunk(
+    val url: String,
+    val durationMs: Long,
+    val mimeType: String,
+)
+
+data class AudioSessionSource(
+    val sessionId: String,
+    val chunks: List<AudioSourceChunk>,
 )
 
 data class TranscriptState(
@@ -398,6 +410,53 @@ class ApiClient(context: Context) {
                 )
             }
             ApiResult.Ok(Unit)
+        }
+    }
+
+    suspend fun downloadAudio(url: String, destination: File): Boolean = withContext(Dispatchers.IO) {
+        runCatching {
+            destination.parentFile?.mkdirs()
+            val request = Request.Builder().url(url).get().build()
+            client.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return@use false
+                val body = response.body ?: return@use false
+                body.byteStream().use { input ->
+                    FileOutputStream(destination).use { output -> input.copyTo(output) }
+                }
+                destination.length() > 0L
+            }
+        }.getOrDefault(false)
+    }
+
+    suspend fun audioSession(sessionId: String): ApiResult<AudioSessionSource> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val encoded = java.net.URLEncoder.encode(sessionId, "UTF-8")
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/audio-sessions/audio?sessionId=$encoded")
+            .get()
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось получить аудио" },
+                    retryable = response.code >= 500,
+                )
+            }
+            val array = json.optJSONArray("chunks") ?: JSONArray()
+            val chunks = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                AudioSourceChunk(
+                    url = item.optString("url"),
+                    durationMs = item.optLong("durationMs"),
+                    mimeType = item.optString("mimeType"),
+                )
+            }.filter { it.url.isNotBlank() }
+            ApiResult.Ok(AudioSessionSource(sessionId = json.optString("sessionId"), chunks = chunks))
         }
     }
 

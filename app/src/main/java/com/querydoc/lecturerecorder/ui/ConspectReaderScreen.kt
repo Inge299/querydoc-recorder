@@ -383,7 +383,7 @@ private fun AudioTabContent(
                         }
                     }
                 }
-                if (isCurrent && playerState.playbackStatus.isNotBlank()) {
+                if (playerState.playbackStatus.isNotBlank()) {
                     Text(
                         text = playerState.playbackStatus,
                         style = MaterialTheme.typography.labelSmall,

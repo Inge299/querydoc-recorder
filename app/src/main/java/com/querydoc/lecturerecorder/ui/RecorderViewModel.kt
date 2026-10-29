@@ -12,6 +12,7 @@ import com.querydoc.lecturerecorder.AppGraph
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectState
 import com.querydoc.lecturerecorder.config.AppConfig
+import com.querydoc.lecturerecorder.data.local.AudioCache
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.recording.AudioRecordingService
@@ -278,7 +279,6 @@ class RecorderViewModel(
     fun playRecordingById(id: String, startFraction: Float?) {
         if (state.value.isRecording) return
         val item = recordingsById[id] ?: return
-        if (item.chunkPaths.isEmpty()) return
         if (state.value.currentPlaybackItemId == id && state.value.isPlaybackPaused && startFraction == null) {
             val player = mediaPlayer ?: return
             player.start()
@@ -286,7 +286,52 @@ class RecorderViewModel(
             return
         }
         viewModelScope.launch {
-            startPlayback(item, startFraction ?: 0f)
+            val playable = preparePlayableItem(item)
+            if (playable != null) startPlayback(playable, startFraction ?: 0f)
+        }
+    }
+
+    private suspend fun preparePlayableItem(item: RecordingListItem): RecordingListItem? {
+        val allLocal = item.chunkPaths.isNotEmpty() && item.chunkPaths.all { File(it).exists() }
+        if (allLocal) return item
+        withContext(Dispatchers.IO) { AudioCache.cleanup(app) }
+        val cached = withContext(Dispatchers.IO) { AudioCache.get(app, item.id) }
+        if (cached != null) {
+            val cachedItem = item.copy(
+                chunkPaths = cached.paths,
+                chunkDurationsMs = cached.durationsMs,
+            )
+            recordingsById = recordingsById + (item.id to cachedItem)
+            return cachedItem
+        }
+        _state.update { it.copy(playbackStatus = "Загружаем аудио из облака…") }
+        return when (val result = api.audioSession(item.id)) {
+            is ApiResult.Ok -> {
+                if (result.value.chunks.isEmpty()) {
+                    _state.update { it.copy(playbackStatus = "Аудио недоступно") }
+                    null
+                } else {
+                    val downloaded = AudioCache.store(app, item.id, result.value.chunks) { url, file ->
+                        api.downloadAudio(url, file)
+                    }
+                    if (downloaded == null) {
+                        _state.update { it.copy(playbackStatus = "Не удалось скачать аудио") }
+                        null
+                    } else {
+                        val remote = item.copy(
+                            chunkPaths = downloaded.paths,
+                            chunkDurationsMs = downloaded.durationsMs,
+                        )
+                        recordingsById = recordingsById + (item.id to remote)
+                        _state.update { it.copy(playbackStatus = "") }
+                        remote
+                    }
+                }
+            }
+            is ApiResult.Failure -> {
+                _state.update { it.copy(playbackStatus = result.message) }
+                null
+            }
         }
     }
 
@@ -449,7 +494,8 @@ class RecorderViewModel(
         }
 
         val path = playbackChunkPaths[index]
-        if (!File(path).exists()) {
+        val isRemote = path.startsWith("http://") || path.startsWith("https://")
+        if (!isRemote && !File(path).exists()) {
             val nextBase = playbackBaseMs + playbackChunkDurationsMs.getOrElse(index) { 0L }
             playbackBaseMs = nextBase
             playChunk(index + 1, 0L, totalMs)
