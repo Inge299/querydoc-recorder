@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import com.querydoc.lecturerecorder.data.remote.ApiClient
@@ -27,6 +28,7 @@ import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
 import com.querydoc.lecturerecorder.ui.RecorderScreen
 import com.querydoc.lecturerecorder.ui.RecorderViewModel
+import com.querydoc.lecturerecorder.ui.SettingsScreen
 import com.querydoc.lecturerecorder.work.CleanupScheduler
 import com.querydoc.lecturerecorder.work.ConspectCache
 import com.querydoc.lecturerecorder.work.ConspectScheduler
@@ -51,12 +53,14 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val api = remember { ApiClient(applicationContext) }
+            val recorderState by viewModel.state.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
             var loggedIn by remember { mutableStateOf(api.hasSession()) }
             var introVisible by remember { mutableStateOf(true) }
             var permissionsRequested by remember { mutableStateOf(false) }
             var restoreAttempted by remember { mutableStateOf(false) }
             var showConspects by remember { mutableStateOf(false) }
+            var showSettings by remember { mutableStateOf(false) }
             var readerSession by remember { mutableStateOf<String?>(null) }
             var readerMarkdown by remember { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
@@ -101,12 +105,16 @@ class MainActivity : ComponentActivity() {
                 introVisible -> "intro"
                 !loggedIn -> "login"
                 readerSession != null -> "reader"
+                showSettings -> "settings"
                 showConspects -> "conspects"
                 else -> "recorder"
             }
             BackHandler(enabled = readerSession != null) {
                 readerSession = null
                 readerMarkdown = null
+            }
+            BackHandler(enabled = showSettings) {
+                showSettings = false
             }
             BackHandler(enabled = readerSession == null && showConspects) {
                 showConspects = false
@@ -139,8 +147,24 @@ class MainActivity : ComponentActivity() {
                             onBrightnessRequested = ::applyScreenBrightness,
                             onRequestConspect = viewModel::requestConspect,
                             onDismissConspect = viewModel::dismissConspect,
-                            onOpenConspects = { showConspects = true }
+                            onOpenConspects = { showConspects = true },
+                            onOpenSettings = { showSettings = true }
                         )
+                            "settings" -> SettingsScreen(
+                                farLecturerMode = recorderState.farLecturerMode,
+                                environmentProfile = recorderState.environmentProfile,
+                                pauseOnInterruptions = recorderState.pauseOnInterruptions,
+                                recognitionLanguage = recorderState.recognitionLanguage,
+                                onToggleFarLecturerMode = viewModel::toggleFarLecturerMode,
+                                onSetPauseOnInterruptions = viewModel::setPauseOnInterruptions,
+                                onSetEnvironmentProfile = viewModel::setEnvironmentProfile,
+                                onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
+                                onLogout = {
+                                    showSettings = false
+                                    scope.launch { api.logout(); loggedIn = false }
+                                },
+                                onBack = { showSettings = false },
+                            )
                             "conspects" -> ConspectsScreen(
                                 api = api,
                                 onBack = { showConspects = false },

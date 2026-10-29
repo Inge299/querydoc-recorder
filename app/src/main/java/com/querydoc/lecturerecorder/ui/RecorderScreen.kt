@@ -104,7 +104,8 @@ fun RecorderScreen(
     onBrightnessRequested: (Float?) -> Unit,
     onRequestConspect: (String) -> Unit,
     onDismissConspect: () -> Unit,
-    onOpenConspects: () -> Unit
+    onOpenConspects: () -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val uiState by state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -112,7 +113,6 @@ fun RecorderScreen(
     var lingeringItemId by remember { mutableStateOf<String?>(null) }
     var lastPlayingItemId by remember { mutableStateOf<String?>(null) }
     var selectionMode by remember { mutableStateOf(false) }
-    var settingsExpanded by remember { mutableStateOf(false) }
     val selectedMap = remember { mutableStateMapOf<String, Boolean>() }
     val seekByItem = remember { mutableStateMapOf<String, Float>() }
     val selectedIds: Set<String> = selectedMap.filterValues { it }.keys
@@ -215,155 +215,16 @@ fun RecorderScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Box {
-                        IconButton(
-                            modifier = Modifier.size(32.dp),
-                            onClick = { settingsExpanded = true }
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Settings,
-                                contentDescription = "Настройки",
-                                tint = Color(0xFFDDEAFD),
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = settingsExpanded,
-                            onDismissRequest = { settingsExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text("Режим записи", style = MaterialTheme.typography.bodySmall) },
-                                onClick = {}
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        (if (!uiState.farLecturerMode) "✓ " else "") + "Обычный",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    )
-                                },
-                                onClick = {
-                                    settingsExpanded = false
-                                    if (uiState.farLecturerMode) onToggleFarLecturerMode()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        (if (uiState.farLecturerMode) "✓ " else "") + "Дальний лектор",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    )
-                                },
-                                onClick = {
-                                    settingsExpanded = false
-                                    if (!uiState.farLecturerMode) onToggleFarLecturerMode()
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Профиль микрофона", style = MaterialTheme.typography.bodySmall) },
-                                onClick = {}
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Прерывания", style = MaterialTheme.typography.bodySmall) },
-                                onClick = {}
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        (if (uiState.pauseOnInterruptions) "✓ " else "") + "Автопауза при звонках",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    )
-                                },
-                                onClick = {
-                                    settingsExpanded = false
-                                    onSetPauseOnInterruptions(true)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        (if (!uiState.pauseOnInterruptions) "✓ " else "") + "Игнорировать звонки",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    )
-                                },
-                                onClick = {
-                                    settingsExpanded = false
-                                    onSetPauseOnInterruptions(false)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        (if (uiState.environmentProfile == EnvironmentProfile.QUIET) "✓ " else "") +
-                                            EnvironmentProfile.QUIET.labelRu(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    )
-                                },
-                                onClick = {
-                                    settingsExpanded = false
-                                    onSetEnvironmentProfile(EnvironmentProfile.QUIET)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        (if (uiState.environmentProfile == EnvironmentProfile.NORMAL) "✓ " else "") +
-                                            EnvironmentProfile.NORMAL.labelRu(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    )
-                                },
-                                onClick = {
-                                    settingsExpanded = false
-                                    onSetEnvironmentProfile(EnvironmentProfile.NORMAL)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        (if (uiState.environmentProfile == EnvironmentProfile.NOISY) "✓ " else "") +
-                                            EnvironmentProfile.NOISY.labelRu(),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(start = 16.dp)
-                                    )
-                                },
-                                onClick = {
-                                    settingsExpanded = false
-                                    onSetEnvironmentProfile(EnvironmentProfile.NOISY)
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text("Язык распознавания", style = MaterialTheme.typography.bodySmall, color = Color(0xFF4338CA)) },
-                                onClick = {}
-                            )
-                            RecognitionLanguage.entries.forEach { language ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            (if (uiState.recognitionLanguage == language) "✓ " else "") + language.label,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            modifier = Modifier.padding(start = 16.dp)
-                                        )
-                                    },
-                                    onClick = {
-                                        settingsExpanded = false
-                                        onSetRecognitionLanguage(language)
-                                    }
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text("Выйти из аккаунта", style = MaterialTheme.typography.bodySmall) },
-                                onClick = {
-                                    settingsExpanded = false
-                                    onLogout()
-                                }
-                            )
-                        }
+                    IconButton(
+                        modifier = Modifier.size(32.dp),
+                        onClick = onOpenSettings,
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = "Настройки",
+                            tint = Color(0xFFDDEAFD),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
