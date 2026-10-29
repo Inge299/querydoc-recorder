@@ -32,10 +32,12 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,10 +50,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.querydoc.lecturerecorder.BuildConfig
+import com.querydoc.lecturerecorder.data.remote.ApiClient
+import com.querydoc.lecturerecorder.data.remote.ApiResult
+import com.querydoc.lecturerecorder.data.remote.UsageSummary
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 
 @Composable
 fun SettingsScreen(
+    api: ApiClient,
     farLecturerMode: Boolean,
     environmentProfile: EnvironmentProfile,
     pauseOnInterruptions: Boolean,
@@ -64,6 +70,14 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     var logoutConfirm by remember { mutableStateOf(false) }
+    var usage by remember { mutableStateOf<UsageSummary?>(null) }
+    var usageError by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        when (val result = api.usage()) {
+            is ApiResult.Ok -> usage = result.value
+            is ApiResult.Failure -> usageError = result.message
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -144,6 +158,24 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsSection(title = "ЛИМИТЫ") {
+                val current = usage
+                if (current == null) {
+                    Text(
+                        if (usageError.isBlank()) "Загрузка…" else usageError,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF64748B),
+                        modifier = Modifier.padding(16.dp),
+                    )
+                } else {
+                    UsageRow("Запись", current.recordingUsedMinutes, current.recordingLimitMinutes, "мин")
+                    UsageDivider()
+                    UsageRow("Вопросы сегодня", current.qaUsed, current.qaLimit, "")
+                    UsageDivider()
+                    UsageRow("Проверка сегодня", current.studyKitUsed, current.studyKitLimit, "")
+                }
+            }
+
             SettingsSection(title = "АККАУНТ") {
                 SettingRow(
                     icon = Icons.Filled.Logout,
@@ -195,6 +227,32 @@ fun SettingsScreen(
             },
         )
     }
+}
+
+@Composable
+private fun UsageRow(label: String, used: Int, limit: Int, unit: String) {
+    val fraction = if (limit > 0) (used.toFloat() / limit.toFloat()).coerceIn(0f, 1f) else 0f
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF334155))
+            Text(
+                "$used / $limit${if (unit.isNotBlank()) " $unit" else ""}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF64748B),
+            )
+        }
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth().padding(top = 5.dp).height(4.dp),
+            color = if (fraction > 0.9f) Color(0xFFDC2626) else Color(0xFF4338CA),
+            trackColor = Color(0xFFE2E8F0),
+        )
+    }
+}
+
+@Composable
+private fun UsageDivider() {
+    Box(Modifier.fillMaxWidth().padding(start = 16.dp).height(1.dp).background(Color(0xFFF1F5F9)))
 }
 
 @Composable

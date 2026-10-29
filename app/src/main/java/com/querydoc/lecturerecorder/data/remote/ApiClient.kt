@@ -76,6 +76,18 @@ data class StudyQuestion(
     val answer: String,
 )
 
+data class UsageSummary(
+    val recordingUsedMinutes: Int,
+    val recordingLimitMinutes: Int,
+    val recordingRemainingMinutes: Int,
+    val qaUsed: Int,
+    val qaLimit: Int,
+    val qaRemaining: Int,
+    val studyKitUsed: Int,
+    val studyKitLimit: Int,
+    val studyKitRemaining: Int,
+)
+
 data class StudyKit(
     val questions: List<StudyQuestion>,
     val checklist: List<String>,
@@ -398,6 +410,37 @@ class ApiClient(context: Context) {
                 )
             }
             ApiResult.Ok(parseConspect(item))
+        }
+    }
+
+    suspend fun usage(): ApiResult<UsageSummary> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/usage")
+            .get()
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось получить лимиты", response.code >= 500)
+            }
+            val recording = json.optJSONObject("recording")
+            val qa = json.optJSONObject("qa")
+            val study = json.optJSONObject("studyKit")
+            ApiResult.Ok(
+                UsageSummary(
+                    recordingUsedMinutes = recording?.optInt("usedMinutes") ?: 0,
+                    recordingLimitMinutes = recording?.optInt("limitMinutes") ?: 300,
+                    recordingRemainingMinutes = recording?.optInt("remainingMinutes") ?: 0,
+                    qaUsed = qa?.optInt("used") ?: 0,
+                    qaLimit = qa?.optInt("limit") ?: 10,
+                    qaRemaining = qa?.optInt("remaining") ?: 0,
+                    studyKitUsed = study?.optInt("used") ?: 0,
+                    studyKitLimit = study?.optInt("limit") ?: 5,
+                    studyKitRemaining = study?.optInt("remaining") ?: 0,
+                ),
+            )
         }
     }
 

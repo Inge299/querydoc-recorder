@@ -157,6 +157,7 @@ class MainActivity : ComponentActivity() {
                             onOpenSettings = { showSettings = true }
                         )
                             "settings" -> SettingsScreen(
+                                api = api,
                                 farLecturerMode = recorderState.farLecturerMode,
                                 environmentProfile = recorderState.environmentProfile,
                                 pauseOnInterruptions = recorderState.pauseOnInterruptions,
