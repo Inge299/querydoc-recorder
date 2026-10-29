@@ -17,6 +17,7 @@ data class RecordingListItem(
     val totalChunks: Int,
     val conspectStatus: String,
     val conspectCreatedAt: String,
+    val conspectEtaSeconds: Long,
     val statusLabel: String,
     val deleteAfterLabel: String
 )

@@ -682,6 +682,7 @@ class RecorderViewModel(
             totalChunks = sorted.size,
             conspectStatus = conspectStatus,
             conspectCreatedAt = conspectDetails?.conspectCreatedAt.orEmpty(),
+            conspectEtaSeconds = conspectDetails?.conspectEtaSeconds ?: 0L,
             statusLabel = "",
             deleteAfterLabel = ""
         )

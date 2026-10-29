@@ -668,11 +668,20 @@ private fun RecordingItemRow(
                     LinearProgressIndicator(
                         modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
                     )
-                    val elapsed = if (recognitionCreatedMs > 0L) {
-                        " · ${formatElapsed(clockMs - recognitionCreatedMs)}"
+                    val elapsed = clockMs - recognitionCreatedMs
+                    val elapsedLabel = if (recognitionCreatedMs > 0L) {
+                        " · ${formatElapsed(elapsed)}"
+                    } else ""
+                    val etaLabel = if (item.conspectEtaSeconds > 0L && recognitionCreatedMs > 0L) {
+                        val remainingMs = (item.conspectEtaSeconds * 1_000L - elapsed).coerceAtLeast(0L)
+                        " · " + if (remainingMs < 60_000L) "меньше минуты" else "≈ ${(remainingMs / 60_000L).coerceAtLeast(1L)} мин"
                     } else ""
                     Text(
-                        text = if (item.conspectStatus == "queued") "В очереди на распознавание$elapsed" else "Распознаётся…$elapsed",
+                        text = if (item.conspectStatus == "queued") {
+                            "В очереди на распознавание$elapsedLabel$etaLabel"
+                        } else {
+                            "Распознаётся…$elapsedLabel$etaLabel"
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF7C3AED),
                     )

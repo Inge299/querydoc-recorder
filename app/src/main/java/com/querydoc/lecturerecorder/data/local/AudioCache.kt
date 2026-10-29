@@ -51,15 +51,29 @@ object AudioCache {
         onProgress: (completed: Int, total: Int) -> Unit = { _, _ -> },
     ): CachedAudio? {
         if (chunks.isEmpty()) return null
-        clear(context, sessionId)
         val dir = sessionDir(context, sessionId)
         if (!dir.mkdirs()) return null
         val lines = mutableListOf<String>()
-        onProgress(0, chunks.size)
+        var alreadyCached = 0
         for ((index, chunk) in chunks.withIndex()) {
             val file = File(dir, String.format("chunk_%04d.m4a", index))
-            if (!download(chunk.url, file)) {
-                clear(context, sessionId)
+            if (file.isFile && file.length() > 0L) {
+                lines += "${index}\t${chunk.durationMs.coerceAtLeast(1_000L)}\t${file.name}"
+                alreadyCached++
+            }
+        }
+        onProgress(alreadyCached, chunks.size)
+        for ((index, chunk) in chunks.withIndex()) {
+            val file = File(dir, String.format("chunk_%04d.m4a", index))
+            if (file.isFile && file.length() > 0L) continue
+            val part = File(dir, file.name + ".part")
+            part.delete()
+            if (!download(chunk.url, part)) {
+                part.delete()
+                return null
+            }
+            if (part.length() == 0L || !part.renameTo(file)) {
+                part.delete()
                 return null
             }
             lines += "${index}\t${chunk.durationMs.coerceAtLeast(1_000L)}\t${file.name}"
@@ -68,7 +82,6 @@ object AudioCache {
         File(dir, MANIFEST).writeText(lines.joinToString("\n"))
         return get(context, sessionId)
     }
-
     fun clear(context: Context, sessionId: String) {
         sessionDir(context, sessionId).deleteRecursively()
     }

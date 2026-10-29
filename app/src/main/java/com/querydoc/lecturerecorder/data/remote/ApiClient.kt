@@ -77,6 +77,7 @@ data class SessionProgress(
     val conspectStatus: String,
     val conspectCreatedAt: String,
     val conspectUpdatedAt: String,
+    val conspectEtaSeconds: Long,
 )
 
 class ApiClient(context: Context) {
@@ -297,6 +298,7 @@ class ApiClient(context: Context) {
                     conspectStatus = item.optString("conspectStatus"),
                     conspectCreatedAt = item.optString("conspectCreatedAt"),
                     conspectUpdatedAt = item.optString("conspectUpdatedAt"),
+                    conspectEtaSeconds = item.optLong("conspectEtaSeconds"),
                 )
             }
             ApiResult.Ok(values)
