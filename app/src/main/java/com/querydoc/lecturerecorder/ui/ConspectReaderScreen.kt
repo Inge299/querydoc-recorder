@@ -32,7 +32,9 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Forward30
 import androidx.compose.material.icons.filled.Replay
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -324,6 +326,12 @@ private fun AudioTabContent(
     val progress = if (totalMs > 0L) (positionMs.toFloat() / totalMs.toFloat()).coerceIn(0f, 1f) else 0f
     var sliderValue by remember(sessionId, progress, totalMs) { mutableFloatStateOf(progress) }
     val isPlaying = isCurrent && playerState.isPlayingLocalAudio
+    val seekBy = { deltaMs: Long ->
+        val base = if (isCurrent) positionMs else savedPositionMs
+        val target = (base + deltaMs).coerceIn(0L, totalMs.coerceAtLeast(0L))
+        val fraction = if (totalMs > 0L) target.toFloat() / totalMs.toFloat() else 0f
+        if (isCurrent) onSeek(sessionId, fraction) else onPlay(sessionId, fraction)
+    }
     val context = LocalContext.current
     var bookmarks by remember(sessionId) { mutableStateOf(BookmarkStore.list(context, sessionId)) }
     var showBookmarkDialog by remember { mutableStateOf(false) }
@@ -394,6 +402,13 @@ private fun AudioTabContent(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     IconButton(
+                        onClick = { seekBy(-10_000L) },
+                        enabled = recording != null,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(Icons.Filled.Replay10, contentDescription = "Назад на 10 секунд", tint = Color(0xFF64748B))
+                    }
+                    IconButton(
                         onClick = { if (isPlaying) onPause(sessionId) else onPlay(sessionId, if (isCurrent) null else sliderValue) },
                         enabled = recording != null,
                         modifier = Modifier.size(56.dp).background(Color(0xFF4338CA), RoundedCornerShape(28.dp)),
@@ -406,11 +421,18 @@ private fun AudioTabContent(
                         )
                     }
                     IconButton(
+                        onClick = { seekBy(30_000L) },
+                        enabled = recording != null,
+                        modifier = Modifier.size(48.dp),
+                    ) {
+                        Icon(Icons.Filled.Forward30, contentDescription = "Вперед на 30 секунд", tint = Color(0xFF64748B))
+                    }
+                    IconButton(
                         onClick = {
                             if (isCurrent) onSeek(sessionId, 0f) else onPlay(sessionId, 0f)
                         },
                         enabled = recording != null,
-                        modifier = Modifier.size(48.dp).padding(start = 8.dp),
+                        modifier = Modifier.size(48.dp),
                     ) {
                         Icon(Icons.Filled.Replay, contentDescription = "В начало", tint = Color(0xFF64748B))
                     }
