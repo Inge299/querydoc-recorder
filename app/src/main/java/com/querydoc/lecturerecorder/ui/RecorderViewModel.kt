@@ -12,6 +12,7 @@ import com.querydoc.lecturerecorder.AppGraph
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectState
 import com.querydoc.lecturerecorder.config.AppConfig
+import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.data.local.AudioCache
 import com.querydoc.lecturerecorder.data.local.PlaybackPositionStore
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
@@ -133,6 +134,7 @@ class RecorderViewModel(
         } else {
             app.startService(startIntent)
         }
+        Analytics.track(app, "recording_started")
         recordingStartedAtMs = System.currentTimeMillis()
         pausedDurationMs = 0L
         pausedAtMs = 0L
@@ -389,6 +391,26 @@ class RecorderViewModel(
         if (state.value.currentPlaybackItemId != id) return
         viewModelScope.launch {
             startPlayback(item, fraction.coerceIn(0f, 1f))
+        }
+    }
+
+    fun clearLocalData() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching { dao.allAudioItems() }.getOrDefault(emptyList()).forEach { item ->
+                runCatching { File(item.filePath).delete() }
+            }
+            runCatching { dao.deleteAll() }
+            runCatching { File(app.filesDir, "audio_chunks").deleteRecursively() }
+            runCatching { File(app.filesDir, "audio_cache").deleteRecursively() }
+            ConspectCache.clearAll(app)
+            _state.update {
+                it.copy(
+                    recordings = emptyList(),
+                    canPlayLocalAudio = false,
+                    currentPlaybackItemId = null,
+                    audioPositions = emptyMap(),
+                )
+            }
         }
     }
 

@@ -83,6 +83,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
+import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.data.local.BookmarkStore
 import com.querydoc.lecturerecorder.data.remote.LectureCitation
 import com.querydoc.lecturerecorder.data.remote.QaHistoryTurn
@@ -406,6 +407,7 @@ private fun LectureQaContent(
     modifier: Modifier = Modifier,
     onOpenCitation: (LectureCitation) -> Unit,
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     var input by remember(sessionId) { mutableStateOf("") }
     var loading by remember(sessionId) { mutableStateOf(false) }
     var error by remember(sessionId) { mutableStateOf("") }
@@ -415,6 +417,7 @@ private fun LectureQaContent(
     fun send(question: String) {
         val trimmed = question.trim()
         if (trimmed.isBlank() || loading) return
+        Analytics.track(context, "qa_asked")
         val history = messages.map { QaHistoryTurn(it.role, it.text) }
         onMessagesChange(messages + QaMessage("user", trimmed))
         input = ""

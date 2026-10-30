@@ -24,6 +24,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Logout
+import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Notifications
@@ -36,6 +37,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,11 +72,17 @@ fun SettingsScreen(
     onSetEnvironmentProfile: (EnvironmentProfile) -> Unit,
     onSetRecognitionLanguage: (RecognitionLanguage) -> Unit,
     onLogout: () -> Unit,
+    onOpenLegal: () -> Unit,
+    onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
     onBack: () -> Unit,
 ) {
     var logoutConfirm by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
+    var deleteDialog by remember { mutableStateOf(false) }
+    var deletePassword by remember { mutableStateOf("") }
+    var deleteBusy by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         when (val result = api.usage()) {
             is ApiResult.Ok -> usage = result.value
@@ -189,6 +197,15 @@ fun SettingsScreen(
                 }
             }
 
+            SettingsSection(title = "ДОКУМЕНТЫ") {
+                SettingRow(
+                    icon = Icons.Filled.Info,
+                    title = "Правовая информация",
+                    subtitle = "Политика, согласие, условия использования",
+                    onClick = onOpenLegal,
+                )
+            }
+
             SettingsSection(title = "АККАУНТ") {
                 SettingRow(
                     icon = Icons.Filled.Logout,
@@ -196,6 +213,18 @@ fun SettingsScreen(
                     subtitle = "Потребуется снова ввести пароль",
                     tint = Color(0xFFDC2626),
                     onClick = { logoutConfirm = true },
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.DeleteForever,
+                    title = "Удалить аккаунт",
+                    subtitle = "Удалить данные и выйти навсегда",
+                    tint = Color(0xFFDC2626),
+                    onClick = {
+                        deletePassword = ""
+                        deleteError = ""
+                        deleteDialog = true
+                    },
                 )
             }
 
@@ -237,6 +266,51 @@ fun SettingsScreen(
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { logoutConfirm = false }) { Text("Отмена") }
+            },
+        )
+    }
+
+    if (deleteDialog) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { if (!deleteBusy) deleteDialog = false },
+            title = { Text("Удалить аккаунт?") },
+            text = {
+                Column {
+                    Text("Будут удалены конспекты, аудио, транскрипты и настройки. Действие необратимо.")
+                    androidx.compose.material3.OutlinedTextField(
+                        value = deletePassword,
+                        onValueChange = { deletePassword = it },
+                        singleLine = true,
+                        label = { Text("Пароль") },
+                        visualTransformation = androidx.compose.ui.text.input.PasswordVisualTransformation(),
+                        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    )
+                    if (deleteError.isNotBlank()) {
+                        Text(deleteError, color = Color(0xFFDC2626), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !deleteBusy && deletePassword.isNotBlank(),
+                    onClick = {
+                        deleteBusy = true
+                        deleteError = ""
+                        // deletion is handled by the caller through the API callback below
+                        onDeleteAccount(deletePassword) { success, message ->
+                            deleteBusy = false
+                            if (success) {
+                                deleteDialog = false
+                                onLogout()
+                            } else {
+                                deleteError = message
+                            }
+                        }
+                    },
+                ) { Text(if (deleteBusy) "Удаляем…" else "Удалить", color = Color(0xFFDC2626)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { if (!deleteBusy) deleteDialog = false }) { Text("Отмена") }
             },
         )
     }
@@ -406,4 +480,5 @@ private fun CheckMark() {
 @Composable
 private fun Chevron() {
     Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
+
 }

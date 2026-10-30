@@ -17,6 +17,10 @@ object ConspectCache {
             .apply()
     }
 
+    fun clearAll(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().clear().apply()
+    }
+
     fun remove(context: Context, sessionId: String) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()

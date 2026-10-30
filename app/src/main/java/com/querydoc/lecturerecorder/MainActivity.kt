@@ -3,6 +3,7 @@ package com.querydoc.lecturerecorder
 import android.Manifest
 import android.content.Intent
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -23,11 +24,17 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import com.querydoc.lecturerecorder.data.remote.ApiClient
+import com.querydoc.lecturerecorder.data.remote.ApiResult
+import com.querydoc.lecturerecorder.diagnostics.Analytics
+import com.querydoc.lecturerecorder.diagnostics.CrashReporter
 import com.querydoc.lecturerecorder.ui.ConspectReaderScreen
 import com.querydoc.lecturerecorder.ui.ConspectsScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
+import com.querydoc.lecturerecorder.ui.LegalScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
 import com.querydoc.lecturerecorder.ui.OnboardingScreen
+import com.querydoc.lecturerecorder.ui.RecoveryScreen
+import com.querydoc.lecturerecorder.ui.RegisterScreen
 import com.querydoc.lecturerecorder.ui.RecorderScreen
 import com.querydoc.lecturerecorder.ui.RecorderViewModel
 import com.querydoc.lecturerecorder.ui.SettingsScreen
@@ -50,6 +57,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        CrashReporter.install(applicationContext)
+        CrashReporter.flush(applicationContext)
         pendingConspectSessionId.value = intent?.getStringExtra(EXTRA_CONSPECT_SESSION_ID)
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
@@ -60,6 +69,9 @@ class MainActivity : ComponentActivity() {
             val onboardingPrefs = remember { applicationContext.getSharedPreferences("onboarding", MODE_PRIVATE) }
             var loggedIn by remember { mutableStateOf(api.hasSession()) }
             var onboardingDone by rememberSaveable { mutableStateOf(onboardingPrefs.getBoolean("done", false)) }
+            var showRegister by rememberSaveable { mutableStateOf(false) }
+            var showRecovery by rememberSaveable { mutableStateOf(false) }
+            var showLegal by rememberSaveable { mutableStateOf(false) }
             var introVisible by rememberSaveable { mutableStateOf(true) }
             var permissionsRequested by remember { mutableStateOf(false) }
             var restoreAttempted by remember { mutableStateOf(false) }
@@ -77,6 +89,7 @@ class MainActivity : ComponentActivity() {
                     if (!loggedIn && api.restoreSession()) loggedIn = true
                 }
                 if (!introVisible && loggedIn) {
+                    Analytics.track(applicationContext, "app_open")
                     if (!viewModel.state.value.isRecording) {
                         NotificationManagerCompat.from(applicationContext).cancelAll()
                     }
@@ -107,8 +120,11 @@ class MainActivity : ComponentActivity() {
             }
             val screen = when {
                 introVisible -> "intro"
+                !loggedIn && showRegister -> "register"
+                !loggedIn && showRecovery -> "recovery"
                 !loggedIn -> "login"
                 !onboardingDone -> "onboarding"
+                showLegal -> "legal"
                 readerSession != null -> "reader"
                 showSettings -> "settings"
                 showConspects -> "conspects"
@@ -122,6 +138,13 @@ class MainActivity : ComponentActivity() {
             BackHandler(enabled = readerSession != null) {
                 readerSession = null
                 readerMarkdown = null
+            }
+            BackHandler(enabled = showRegister || showRecovery) {
+                showRegister = false
+                showRecovery = false
+            }
+            BackHandler(enabled = showLegal) {
+                showLegal = false
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
@@ -175,6 +198,7 @@ class MainActivity : ComponentActivity() {
                             onOpenConspects = { showConspects = true },
                             onOpenSettings = { showSettings = true }
                         )
+                            "legal" -> LegalScreen(onBack = { showLegal = false })
                             "settings" -> SettingsScreen(
                                 api = api,
                                 farLecturerMode = recorderState.farLecturerMode,
@@ -187,6 +211,18 @@ class MainActivity : ComponentActivity() {
                                 onSetPauseAudioOnLeave = viewModel::setPauseAudioOnLeave,
                                 onSetEnvironmentProfile = viewModel::setEnvironmentProfile,
                                 onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
+                                onOpenLegal = { showLegal = true },
+                                onDeleteAccount = { password, callback ->
+                                    scope.launch {
+                                        when (val result = api.deleteAccount(password)) {
+                                            is ApiResult.Ok -> {
+                                                viewModel.clearLocalData()
+                                                callback(true, "")
+                                            }
+                                            is ApiResult.Failure -> callback(false, result.message)
+                                        }
+                                    }
+                                },
                                 onLogout = {
                                     showSettings = false
                                     scope.launch { api.logout(); loggedIn = false }
@@ -220,6 +256,7 @@ class MainActivity : ComponentActivity() {
                                 onFinish = {
                                     onboardingPrefs.edit().putBoolean("done", true).apply()
                                     onboardingDone = true
+                                    Analytics.track(applicationContext, "onboarding_complete")
                                     permissionLauncher.launch(
                                         arrayOf(
                                             Manifest.permission.RECORD_AUDIO,
@@ -228,7 +265,28 @@ class MainActivity : ComponentActivity() {
                                     )
                                 },
                             )
-                            else -> LoginScreen(api = api, onLoggedIn = { loggedIn = true })
+                            "register" -> RegisterScreen(
+                                api = api,
+                                onBack = { showRegister = false },
+                                onCompleted = {
+                                    showRegister = false
+                                    loggedIn = true
+                                },
+                            )
+                            "recovery" -> RecoveryScreen(
+                                api = api,
+                                onBack = { showRecovery = false },
+                                onCompleted = {
+                                    showRecovery = false
+                                    Toast.makeText(applicationContext, "Пароль изменён. Войдите снова.", Toast.LENGTH_LONG).show()
+                                },
+                            )
+                            else -> LoginScreen(
+                                api = api,
+                                onLoggedIn = { loggedIn = true },
+                                onRegister = { showRegister = true },
+                                onRecover = { showRecovery = true },
+                            )
                         }
                     }
                 }

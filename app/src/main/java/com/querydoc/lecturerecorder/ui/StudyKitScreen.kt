@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.data.local.StudyProgressStore
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
@@ -68,7 +69,10 @@ fun StudyKitScreen(
         loading = true
         error = ""
         when (val result = api.studyKit(sessionId, forceRefresh)) {
-            is ApiResult.Ok -> kit = result.value
+            is ApiResult.Ok -> {
+                kit = result.value
+                Analytics.track(context, "study_kit_opened")
+            }
             is ApiResult.Failure -> error = result.message
         }
         forceRefresh = false

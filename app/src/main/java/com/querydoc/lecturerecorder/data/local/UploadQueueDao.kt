@@ -45,6 +45,9 @@ interface UploadQueueDao {
     @Query("SELECT * FROM upload_queue WHERE filePath = :filePath LIMIT 1")
     suspend fun findByFilePath(filePath: String): UploadQueueEntity?
 
+    @Query("DELETE FROM upload_queue")
+    suspend fun deleteAll()
+
     @Query("DELETE FROM upload_queue WHERE id = :id")
     suspend fun deleteById(id: String)
 

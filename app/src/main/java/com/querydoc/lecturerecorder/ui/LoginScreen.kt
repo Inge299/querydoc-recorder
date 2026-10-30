@@ -35,7 +35,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiResult
 import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(api: ApiClient, onLoggedIn: () -> Unit) {
+fun LoginScreen(api: ApiClient, onLoggedIn: () -> Unit, onRegister: () -> Unit, onRecover: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var phone by remember { mutableStateOf("") }
@@ -105,7 +105,7 @@ fun LoginScreen(api: ApiClient, onLoggedIn: () -> Unit) {
         ) {
             if (busy) CircularProgressIndicator(modifier = Modifier.padding(end = 12.dp)) else Text("Войти")
         }
-        TextButton(onClick = { openWeb("/auth/register") }) { Text("Регистрация на сайте") }
-        TextButton(onClick = { openWeb("/auth/forgot-password") }) { Text("Забыли пароль?") }
+        TextButton(onClick = onRegister) { Text("Создать аккаунт") }
+        TextButton(onClick = onRecover) { Text("Забыли пароль?") }
     }
 }

@@ -76,6 +76,14 @@ data class StudyQuestion(
     val answer: String,
 )
 
+data class AuthChallenge(
+    val login: String,
+    val channel: String,
+    val callPhone: String,
+    val callCheckId: String,
+    val message: String,
+)
+
 data class UsageSummary(
     val recordingUsedMinutes: Int,
     val recordingLimitMinutes: Int,
@@ -151,6 +159,137 @@ class ApiClient(context: Context) {
         ApiResult.Failure(0, "network_error", "Нет подключения к интернету", true)
 
     fun hasSession(): Boolean = cookieJar.hasSessionCookie()
+
+    suspend fun trackEvent(name: String, props: Map<String, String> = emptyMap()): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val event = JSONObject().put("name", name)
+        if (props.isNotEmpty()) {
+            val propsJson = JSONObject()
+            props.forEach { (key, value) -> propsJson.put(key, value) }
+            event.put("props", propsJson)
+        }
+        val body = JSONObject().put("events", JSONArray().put(event)).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/events")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", "Не удалось сохранить событие", false)
+        }
+    }
+
+    suspend fun deleteAccount(password: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/account/delete")
+            .post(JSONObject().put("password", password).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Не удалось удалить аккаунт" }, false)
+        }
+    }
+
+    suspend fun register(phone: String, password: String): ApiResult<AuthChallenge> = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("login", phone.trim()).put("password", password).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/register")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    status = response.code,
+                    code = json?.optString("code").orEmpty(),
+                    message = json?.optString("error").orEmpty().ifBlank { "Не удалось зарегистрироваться" },
+                    retryable = response.code >= 500,
+                )
+            }
+            ApiResult.Ok(
+                AuthChallenge(
+                    login = json.optString("login", phone.trim()),
+                    channel = json.optString("channel"),
+                    callPhone = json.optString("callPhone"),
+                    callCheckId = json.optString("callCheckId"),
+                    message = json.optString("message"),
+                ),
+            )
+        }
+    }
+
+    suspend fun confirmRegistrationCall(phone: String, checkId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("phone", phone.trim()).put("checkId", checkId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/phone-verification/call/confirm")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Звонок ещё не подтверждён" }, false)
+        }
+    }
+
+    suspend fun requestPasswordReset(phone: String): ApiResult<AuthChallenge> = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("login", phone.trim()).put("channel", "call").toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/password-reset/request")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Не удалось начать восстановление" }, false)
+            }
+            ApiResult.Ok(
+                AuthChallenge(
+                    login = phone.trim(),
+                    channel = json.optString("channel"),
+                    callPhone = json.optString("callPhone"),
+                    callCheckId = json.optString("callCheckId"),
+                    message = json.optString("message"),
+                ),
+            )
+        }
+    }
+
+    suspend fun confirmPasswordResetCall(phone: String, checkId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("login", phone.trim()).put("checkId", checkId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/password-reset/call/confirm")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Звонок ещё не подтверждён" }, false)
+        }
+    }
+
+    suspend fun resetPassword(phone: String, newPassword: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        val body = JSONObject().put("login", phone.trim()).put("newPassword", newPassword).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/password-reset/confirm")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Не удалось изменить пароль" }, false)
+        }
+    }
 
     suspend fun login(phone: String, password: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
         val body = JSONObject().put("login", phone.trim()).put("password", password).put("rememberDevice", true).toString()

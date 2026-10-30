@@ -18,6 +18,7 @@ import com.querydoc.lecturerecorder.MainActivity
 import com.querydoc.lecturerecorder.R
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectState
+import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
 import kotlinx.coroutines.delay
 
@@ -43,6 +44,7 @@ class ConspectWorker(
                         ConspectCache.save(applicationContext, sessionId, state.markdown)
                         ConspectScheduler.markUnseen(applicationContext, sessionId)
                         notifyCompleted(sessionId, state.markdown)
+                        Analytics.track(applicationContext, "conspect_completed")
                         Diagnostics.info(applicationContext, "ConspectWorker: completed $sessionId")
                         return Result.success()
                     }
