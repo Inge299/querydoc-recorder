@@ -765,8 +765,8 @@ private fun RecordingItemRow(
 }
 
 private fun levelWord(level: Float): String = when {
-    level < 0.02f -> "Тишина"
-    level < 0.2f -> "Тихо"
+    level < 0.005f -> "Тишина"
+    level < 0.08f -> "Тихо"
     level < 0.75f -> "Хороший уровень"
     else -> "Громко"
 }
