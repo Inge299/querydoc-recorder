@@ -14,3 +14,8 @@
 Thumbs.db
 
 .debug.keystore
+
+# release signing material
+keystore.properties
+*.jks
+*.keystore

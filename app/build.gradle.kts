@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,8 +14,8 @@ android {
         applicationId = "com.querydoc.lecturerecorder"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val apiBaseUrl = (project.findProperty("querydoc.apiBaseUrl") as String?) ?: "https://querydoc.ru"
@@ -24,6 +26,25 @@ android {
     }
 
     signingConfigs {
+        create("release") {
+            val keystoreProperties = rootProject.file("keystore.properties")
+            if (keystoreProperties.exists()) {
+                val properties = Properties()
+                keystoreProperties.inputStream().use(properties::load)
+                storeFile = file(properties.getProperty("storeFile"))
+                storePassword = properties.getProperty("storePassword")
+                keyAlias = properties.getProperty("keyAlias")
+                keyPassword = properties.getProperty("keyPassword")
+            } else {
+                val storePath = System.getenv("QUERYDOC_KEYSTORE_PATH")
+                if (!storePath.isNullOrBlank()) {
+                    storeFile = file(storePath)
+                    storePassword = System.getenv("QUERYDOC_KEYSTORE_PASSWORD")
+                    keyAlias = System.getenv("QUERYDOC_KEY_ALIAS")
+                    keyPassword = System.getenv("QUERYDOC_KEY_PASSWORD")
+                }
+            }
+        }
         getByName("debug") {
             val localDebugKeystore = rootProject.file(".debug.keystore")
             if (localDebugKeystore.exists()) {
@@ -37,6 +58,9 @@ android {
 
     buildTypes {
         release {
+            // Никогда не подписываем release debug-ключом. Без keystore
+            // собирается unsigned APK, который нельзя публиковать.
+            signingConfig = signingConfigs.getByName("release").takeIf { it.storeFile != null }
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
