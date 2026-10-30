@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SettingsVoice
@@ -61,9 +62,11 @@ fun SettingsScreen(
     farLecturerMode: Boolean,
     environmentProfile: EnvironmentProfile,
     pauseOnInterruptions: Boolean,
+    pauseAudioOnLeave: Boolean,
     recognitionLanguage: RecognitionLanguage,
     onToggleFarLecturerMode: () -> Unit,
     onSetPauseOnInterruptions: (Boolean) -> Unit,
+    onSetPauseAudioOnLeave: (Boolean) -> Unit,
     onSetEnvironmentProfile: (EnvironmentProfile) -> Unit,
     onSetRecognitionLanguage: (RecognitionLanguage) -> Unit,
     onLogout: () -> Unit,
@@ -140,6 +143,16 @@ fun SettingsScreen(
                     subtitle = "При входящем звонке запись ставится на паузу",
                     checked = pauseOnInterruptions,
                     onCheckedChange = onSetPauseOnInterruptions,
+                )
+            }
+
+            SettingsSection(title = "АУДИО") {
+                ToggleRow(
+                    icon = Icons.Filled.Headphones,
+                    title = "Пауза при переходе",
+                    subtitle = "Останавливать аудио при уходе с вкладки «Аудио»",
+                    checked = pauseAudioOnLeave,
+                    onCheckedChange = onSetPauseAudioOnLeave,
                 )
             }
 

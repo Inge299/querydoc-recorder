@@ -30,6 +30,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Category
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
@@ -90,6 +93,7 @@ fun ConspectsScreen(
     var subjectTarget by remember { mutableStateOf<ConspectSummary?>(null) }
     var subjects by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var showSubjectsManager by remember { mutableStateOf(false) }
+    var expandedSubjects by remember { mutableStateOf<Set<String>>(emptySet()) }
     var deleting by remember { mutableStateOf(false) }
     var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
     val scope = rememberCoroutineScope()
@@ -229,9 +233,21 @@ fun ConspectsScreen(
                 ) {
                     subjectGroups.forEach { (subject, rows) ->
                         item(key = "subject_$subject") {
-                            SubjectHeader(subject = subject, count = rows.size)
+                            SubjectHeader(
+                                subject = subject,
+                                count = rows.size,
+                                expanded = subject in expandedSubjects,
+                                onToggle = {
+                                    expandedSubjects = if (subject in expandedSubjects) {
+                                        expandedSubjects - subject
+                                    } else {
+                                        expandedSubjects + subject
+                                    }
+                                },
+                            )
                         }
-                        items(rows, key = { it.sessionId }) { item ->
+                        if (subject in expandedSubjects) {
+                            items(rows, key = { it.sessionId }) { item ->
                             ConspectRow(
                                 item = item,
                                 hasLocalCopy = item.sessionId in cachedIds,
@@ -245,6 +261,7 @@ fun ConspectsScreen(
                                 onDeleteRemote = { deleteTarget = item },
                                 onEditSubject = { subjectTarget = item },
                             )
+                            }
                         }
                     }
                 }
@@ -415,26 +432,49 @@ private fun formatConspectDate(value: String): String {
 }
 
 @Composable
-private fun SubjectHeader(subject: String, count: Int) {
-    Row(
+private fun SubjectHeader(subject: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 6.dp, end = 6.dp, top = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+            .clickable(onClick = onToggle),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        Text(
-            text = subject.uppercase(),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF64748B),
-            fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.8.sp,
-        )
-        Text(
-            text = count.toString(),
-            style = MaterialTheme.typography.labelSmall,
-            color = Color(0xFF94A3B8),
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color(0xFFEEF2FF), RoundedCornerShape(10.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.Filled.Folder, contentDescription = null, tint = Color(0xFF4338CA), modifier = Modifier.size(19.dp))
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    subject,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF1E1B4B),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    "$count ${conspectWord(count)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF64748B),
+                )
+            }
+            Icon(
+                if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
+                contentDescription = if (expanded) "Свернуть предмет" else "Развернуть предмет",
+                tint = Color(0xFF64748B),
+            )
+        }
     }
 }
 

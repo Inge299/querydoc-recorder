@@ -110,6 +110,11 @@ class MainActivity : ComponentActivity() {
                 showConspects -> "conspects"
                 else -> "recorder"
             }
+            LaunchedEffect(showConspects, readerSession) {
+                if (showConspects || readerSession != null) {
+                    NotificationManagerCompat.from(applicationContext).cancelAll()
+                }
+            }
             BackHandler(enabled = readerSession != null) {
                 readerSession = null
                 readerMarkdown = null
@@ -129,6 +134,16 @@ class MainActivity : ComponentActivity() {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.isAppearanceLightStatusBars = screen != "intro"
                 controller.isAppearanceLightNavigationBars = false
+            }
+            LaunchedEffect(screen) {
+                if (screen != "recorder") return@LaunchedEffect
+                while (true) {
+                    delay(10_000L)
+                    viewModel.refreshRecordings()
+                    if (!viewModel.state.value.isRecording) {
+                        NotificationManagerCompat.from(applicationContext).cancelAll()
+                    }
+                }
             }
             MaterialTheme {
                 Surface {
@@ -161,9 +176,11 @@ class MainActivity : ComponentActivity() {
                                 farLecturerMode = recorderState.farLecturerMode,
                                 environmentProfile = recorderState.environmentProfile,
                                 pauseOnInterruptions = recorderState.pauseOnInterruptions,
+                                pauseAudioOnLeave = recorderState.pauseAudioOnLeave,
                                 recognitionLanguage = recorderState.recognitionLanguage,
                                 onToggleFarLecturerMode = viewModel::toggleFarLecturerMode,
                                 onSetPauseOnInterruptions = viewModel::setPauseOnInterruptions,
+                                onSetPauseAudioOnLeave = viewModel::setPauseAudioOnLeave,
                                 onSetEnvironmentProfile = viewModel::setEnvironmentProfile,
                                 onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
                                 onLogout = {
@@ -185,6 +202,7 @@ class MainActivity : ComponentActivity() {
                                 sessionId = readerSession.orEmpty(),
                                 initialMarkdown = readerMarkdown,
                                 playerState = recorderState,
+                                pauseAudioOnLeave = recorderState.pauseAudioOnLeave,
                                 onPlay = viewModel::playRecordingById,
                                 onPause = viewModel::pausePlaybackForItem,
                                 onStop = viewModel::stopPlaybackForItem,
@@ -205,6 +223,9 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.refreshRecordings()
+        if (!viewModel.state.value.isRecording) {
+            NotificationManagerCompat.from(applicationContext).cancelAll()
+        }
     }
 
     override fun onStop() {

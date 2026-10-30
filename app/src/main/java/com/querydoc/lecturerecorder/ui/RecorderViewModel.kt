@@ -48,6 +48,7 @@ class RecorderViewModel(
     private val prefs = app.getSharedPreferences(PREFS_NAME, Application.MODE_PRIVATE)
     private val initialFarLecturerMode = prefs.getBoolean(KEY_FAR_MODE, true)
     private val initialPauseOnInterruptions = prefs.getBoolean(KEY_PAUSE_ON_INTERRUPTION, true)
+    private val initialPauseAudioOnLeave = prefs.getBoolean(KEY_PAUSE_AUDIO_ON_LEAVE, true)
     private val initialEnvironmentProfile = EnvironmentProfile.fromName(
         prefs.getString(KEY_ENVIRONMENT_PROFILE, EnvironmentProfile.NORMAL.name)
     )
@@ -60,6 +61,7 @@ class RecorderViewModel(
             hasMicPermission = false,
             farLecturerMode = initialFarLecturerMode,
             pauseOnInterruptions = initialPauseOnInterruptions,
+            pauseAudioOnLeave = initialPauseAudioOnLeave,
             environmentProfile = initialEnvironmentProfile,
             recognitionLanguage = initialRecognitionLanguage,
             energySaverEnabled = AppConfig.Power.enableEnergySaverByDefault,
@@ -195,6 +197,11 @@ class RecorderViewModel(
         idleMicMonitor.setFarLecturerMode(next)
         prefs.edit().putBoolean(KEY_FAR_MODE, next).apply()
         _state.update { it.copy(farLecturerMode = next) }
+    }
+
+    fun setPauseAudioOnLeave(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_PAUSE_AUDIO_ON_LEAVE, enabled).apply()
+        _state.update { it.copy(pauseAudioOnLeave = enabled) }
     }
 
     fun setPauseOnInterruptions(enabled: Boolean) {
@@ -776,6 +783,7 @@ class RecorderViewModel(
         private const val PREFS_NAME = "recorder_preferences"
         private const val KEY_FAR_MODE = "far_mode"
         private const val KEY_PAUSE_ON_INTERRUPTION = "pause_on_interruption"
+        private const val KEY_PAUSE_AUDIO_ON_LEAVE = "pause_audio_on_leave"
         private const val KEY_RECOGNITION_LANGUAGE = "recognition_language"
         private const val KEY_ENVIRONMENT_PROFILE = "environment_profile"
     }

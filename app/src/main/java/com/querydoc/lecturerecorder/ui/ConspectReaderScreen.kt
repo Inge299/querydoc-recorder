@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -95,6 +96,7 @@ fun ConspectReaderScreen(
     sessionId: String,
     initialMarkdown: String?,
     playerState: RecorderUiState,
+    pauseAudioOnLeave: Boolean,
     onPlay: (String, Float?) -> Unit,
     onPause: (String) -> Unit,
     onStop: (String) -> Unit,
@@ -161,11 +163,26 @@ fun ConspectReaderScreen(
         .ifBlank { "Конспект" }
     val shareText = when (tab) { 0 -> markdown; 1 -> transcript; else -> "" }
     val canShare = (tab == 0 || tab == 1) && shareText.isNotBlank()
+    fun pauseIfLeavingAudio(nextTab: Int) {
+        if (pauseAudioOnLeave && tab == 2 && nextTab != 2 && playerState.currentPlaybackItemId == sessionId) {
+            onPause(sessionId)
+        }
+    }
+    fun selectTab(nextTab: Int) {
+        pauseIfLeavingAudio(nextTab)
+        tab = nextTab
+    }
+    fun closeReader() {
+        pauseIfLeavingAudio(-1)
+        onBack()
+    }
 
     if (showStudyKit) {
         StudyKitScreen(api = api, sessionId = sessionId, onBack = { showStudyKit = false })
         return
     }
+
+    BackHandler { closeReader() }
 
     Column(
         modifier = Modifier
@@ -180,7 +197,7 @@ fun ConspectReaderScreen(
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = onBack) {
+            IconButton(onClick = { closeReader() }) {
                 Icon(Icons.Filled.ArrowBack, contentDescription = "Назад", tint = Color(0xFF0F172A))
             }
             Column(modifier = Modifier.weight(1f)) {
@@ -232,10 +249,10 @@ fun ConspectReaderScreen(
                 .padding(3.dp),
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            ReaderTab("Конспект", selected = tab == 0, modifier = Modifier.weight(1f)) { tab = 0 }
-            ReaderTab("Текст", selected = tab == 1, modifier = Modifier.weight(1f)) { tab = 1 }
-            ReaderTab("Аудио", selected = tab == 2, modifier = Modifier.weight(1f)) { tab = 2 }
-            ReaderTab("Вопрос", selected = tab == 3, modifier = Modifier.weight(1f)) { tab = 3 }
+            ReaderTab("Конспект", selected = tab == 0, modifier = Modifier.weight(1f)) { selectTab(0) }
+            ReaderTab("Текст", selected = tab == 1, modifier = Modifier.weight(1f)) { selectTab(1) }
+            ReaderTab("Аудио", selected = tab == 2, modifier = Modifier.weight(1f)) { selectTab(2) }
+            ReaderTab("Вопрос", selected = tab == 3, modifier = Modifier.weight(1f)) { selectTab(3) }
         }
 
         if (tab == 0) {
@@ -343,7 +360,7 @@ fun ConspectReaderScreen(
                 onStop = onStop,
                 onSeek = onSeek,
                 onBackToQuestions = {
-                    if (playerState.currentPlaybackItemId == sessionId) {
+                    if (pauseAudioOnLeave && playerState.currentPlaybackItemId == sessionId) {
                         onPause(sessionId)
                     }
                     tab = 3
