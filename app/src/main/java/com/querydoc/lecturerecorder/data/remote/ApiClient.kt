@@ -707,6 +707,21 @@ class ApiClient(context: Context) {
         }
     }
 
+    suspend fun deleteAudioSession(sessionId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val encoded = java.net.URLEncoder.encode(sessionId, "UTF-8")
+        val request = Request.Builder()
+            .url("$baseUrl/api/materials/audio-sessions/$encoded")
+            .delete()
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось удалить пакет" }, false)
+        }
+    }
+
     suspend fun deleteConspect(sessionId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val payload = JSONObject().put("sessionId", sessionId).toString()

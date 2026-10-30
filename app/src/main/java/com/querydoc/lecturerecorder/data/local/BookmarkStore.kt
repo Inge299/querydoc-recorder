@@ -44,6 +44,10 @@ object BookmarkStore {
         return bookmark
     }
 
+    fun clearSession(context: Context, sessionId: String) {
+        prefs(context).edit().remove(sessionId).apply()
+    }
+
     fun remove(context: Context, sessionId: String, id: String) {
         val items = list(context, sessionId).filterNot { it.id == id }
         save(context, sessionId, items)

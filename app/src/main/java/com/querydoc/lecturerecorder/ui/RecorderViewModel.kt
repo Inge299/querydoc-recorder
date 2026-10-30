@@ -14,6 +14,8 @@ import com.querydoc.lecturerecorder.data.remote.ConspectState
 import com.querydoc.lecturerecorder.config.AppConfig
 import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.data.local.AudioCache
+import com.querydoc.lecturerecorder.data.local.BookmarkStore
+import com.querydoc.lecturerecorder.data.local.StudyProgressStore
 import com.querydoc.lecturerecorder.data.local.PlaybackPositionStore
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
@@ -391,6 +393,32 @@ class RecorderViewModel(
         if (state.value.currentPlaybackItemId != id) return
         viewModelScope.launch {
             startPlayback(item, fraction.coerceIn(0f, 1f))
+        }
+    }
+
+    fun deleteLocalPackage(sessionId: String) {
+        if (state.value.currentPlaybackItemId == sessionId) {
+            stopPlaybackInternal(clearItem = true)
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val item = recordingsById[sessionId]
+            item?.chunkPaths?.forEach { path ->
+                runCatching { File(path).delete() }
+                runCatching { dao.deleteByFilePath(path) }
+            }
+            AudioCache.clear(app, sessionId)
+            BookmarkStore.clearSession(app, sessionId)
+            StudyProgressStore.clear(app, sessionId)
+            PlaybackPositionStore.clear(app, sessionId)
+            ConspectCache.remove(app, sessionId)
+            recordingsById = recordingsById - sessionId
+            _state.update {
+                it.copy(
+                    recordings = it.recordings.filterNot { row -> row.id == sessionId },
+                    audioPositions = it.audioPositions - sessionId,
+                    currentPlaybackItemId = if (it.currentPlaybackItemId == sessionId) null else it.currentPlaybackItemId,
+                )
+            }
         }
     }
 

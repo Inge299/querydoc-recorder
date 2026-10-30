@@ -81,6 +81,7 @@ import java.util.Locale
 @Composable
 fun ConspectsScreen(
     api: ApiClient,
+    onDeleteLocalPackage: (String) -> Unit,
     onBack: () -> Unit,
     onOpen: (ConspectSummary) -> Unit,
 ) {
@@ -253,10 +254,10 @@ fun ConspectsScreen(
                                 hasLocalCopy = item.sessionId in cachedIds,
                                 onClick = { onOpen(item) },
                                 onRemoveLocal = {
-                                    ConspectCache.remove(context, item.sessionId)
+                                    onDeleteLocalPackage(item.sessionId)
                                     cachedIds = cachedIds - item.sessionId
                                     if (offline) items = items.filterNot { it.sessionId == item.sessionId }
-                                    Toast.makeText(context, "Копия удалена с устройства", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Пакет удалён с устройства", Toast.LENGTH_SHORT).show()
                                 },
                                 onDeleteRemote = { deleteTarget = item },
                                 onEditSubject = { subjectTarget = item },
@@ -293,20 +294,20 @@ fun ConspectsScreen(
         AlertDialog(
             onDismissRequest = { if (!deleting) deleteTarget = null },
             title = { Text("Удалить конспект?") },
-            text = { Text("Конспект будет удалён с сервера и с устройства. Аудиозапись останется.") },
+            text = { Text("Будут удалены аудиозапись, транскрипт и конспект — с сервера и с устройства. Действие необратимо.") },
             confirmButton = {
                 TextButton(
                     enabled = !deleting,
                     onClick = {
                         deleting = true
                         scope.launch {
-                            when (val result = api.deleteConspect(target.sessionId)) {
+                            when (val result = api.deleteAudioSession(target.sessionId)) {
                                 is ApiResult.Ok -> {
-                                    ConspectCache.remove(context, target.sessionId)
+                                    onDeleteLocalPackage(target.sessionId)
                                     items = items.filterNot { it.sessionId == target.sessionId }
                                     cachedIds = cachedIds - target.sessionId
                                     deleteTarget = null
-                                    Toast.makeText(context, "Конспект удалён", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, "Пакет удалён", Toast.LENGTH_SHORT).show()
                                 }
                                 is ApiResult.Failure -> {
                                     Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
@@ -541,7 +542,7 @@ private fun ConspectRow(
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             if (hasLocalCopy) {
                                 DropdownMenuItem(
-                                    text = { Text("Убрать с устройства") },
+                                    text = { Text("Удалить с устройства") },
                                     onClick = {
                                         menuExpanded = false
                                         onRemoveLocal()
@@ -557,7 +558,7 @@ private fun ConspectRow(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Удалить конспект", color = Color(0xFFDC2626)) },
+                                text = { Text("Удалить везде", color = Color(0xFFDC2626)) },
                                 leadingIcon = { Icon(Icons.Filled.Delete, contentDescription = null, tint = Color(0xFFDC2626)) },
                                 onClick = {
                                     menuExpanded = false

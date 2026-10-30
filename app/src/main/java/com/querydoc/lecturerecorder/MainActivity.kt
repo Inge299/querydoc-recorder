@@ -231,6 +231,7 @@ class MainActivity : ComponentActivity() {
                             )
                             "conspects" -> ConspectsScreen(
                                 api = api,
+                                onDeleteLocalPackage = viewModel::deleteLocalPackage,
                                 onBack = { showConspects = false },
                                 onOpen = { summary ->
                                     readerMarkdown = summary.markdown

@@ -14,6 +14,10 @@ object StudyProgressStore {
             .toSet()
     }
 
+    fun clear(context: Context, sessionId: String) {
+        context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(sessionId).apply()
+    }
+
     fun save(context: Context, sessionId: String, checked: Set<Int>) {
         context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
             .edit()
