@@ -27,6 +27,7 @@ import com.querydoc.lecturerecorder.ui.ConspectReaderScreen
 import com.querydoc.lecturerecorder.ui.ConspectsScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
+import com.querydoc.lecturerecorder.ui.OnboardingScreen
 import com.querydoc.lecturerecorder.ui.RecorderScreen
 import com.querydoc.lecturerecorder.ui.RecorderViewModel
 import com.querydoc.lecturerecorder.ui.SettingsScreen
@@ -56,7 +57,9 @@ class MainActivity : ComponentActivity() {
             val api = remember { ApiClient(applicationContext) }
             val recorderState by viewModel.state.collectAsStateWithLifecycle()
             val scope = rememberCoroutineScope()
+            val onboardingPrefs = remember { applicationContext.getSharedPreferences("onboarding", MODE_PRIVATE) }
             var loggedIn by remember { mutableStateOf(api.hasSession()) }
+            var onboardingDone by rememberSaveable { mutableStateOf(onboardingPrefs.getBoolean("done", false)) }
             var introVisible by rememberSaveable { mutableStateOf(true) }
             var permissionsRequested by remember { mutableStateOf(false) }
             var restoreAttempted by remember { mutableStateOf(false) }
@@ -83,7 +86,7 @@ class MainActivity : ComponentActivity() {
                     }
                     UploadScheduler.enqueue(applicationContext)
                     CleanupScheduler.enqueue(applicationContext)
-                    if (!permissionsRequested) {
+                    if (!permissionsRequested && onboardingDone) {
                         permissionsRequested = true
                         permissionLauncher.launch(
                             arrayOf(
@@ -105,6 +108,7 @@ class MainActivity : ComponentActivity() {
             val screen = when {
                 introVisible -> "intro"
                 !loggedIn -> "login"
+                !onboardingDone -> "onboarding"
                 readerSession != null -> "reader"
                 showSettings -> "settings"
                 showConspects -> "conspects"
@@ -210,6 +214,18 @@ class MainActivity : ComponentActivity() {
                                 onBack = {
                                     readerSession = null
                                     readerMarkdown = null
+                                },
+                            )
+                            "onboarding" -> OnboardingScreen(
+                                onFinish = {
+                                    onboardingPrefs.edit().putBoolean("done", true).apply()
+                                    onboardingDone = true
+                                    permissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.RECORD_AUDIO,
+                                            Manifest.permission.POST_NOTIFICATIONS,
+                                        ),
+                                    )
                                 },
                             )
                             else -> LoginScreen(api = api, onLoggedIn = { loggedIn = true })
