@@ -265,8 +265,8 @@ class ChunkedAacRecorder(
         sumVoiceLevel += voiceOnly * read
         sumGain += smoothedAgcGain * read
         if (voiceOnly > peakVoiceLevel) peakVoiceLevel = voiceOnly
-        RecordingTelemetry.updateSoundLevel(softLimit(voiceOnly * smoothedAgcGain))
-        RecordingTelemetry.updateAverageSoundLevel(softLimit(smoothedAverage * smoothedAgcGain))
+        RecordingTelemetry.updateSoundLevel(softLimit(voiceOnly * smoothedAgcGain * 1.3f))
+        RecordingTelemetry.updateAverageSoundLevel(softLimit(smoothedAverage * smoothedAgcGain * 1.25f))
         RecordingTelemetry.updateAgcGain(smoothedAgcGain)
         return smoothedAgcGain
     }

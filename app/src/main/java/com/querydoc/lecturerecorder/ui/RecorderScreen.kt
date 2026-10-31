@@ -292,19 +292,7 @@ fun RecorderScreen(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text("Лимит записи", style = MaterialTheme.typography.labelMedium, color = Color(0xFF475569))
-                    Text(
-                        if (uiState.usageLoaded) "Осталось ${uiState.recordingRemainingMinutes} мин" else "Загрузка…",
-                        style = MaterialTheme.typography.labelSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (fraction > 0.9f) Color(0xFFDC2626) else Color(0xFF4338CA),
-                    )
-                }
+                Text("Лимит записи", style = MaterialTheme.typography.labelMedium, color = Color(0xFF475569))
                 LinearProgressIndicator(
                     progress = { fraction },
                     modifier = Modifier.fillMaxWidth().height(6.dp),
@@ -312,7 +300,7 @@ fun RecorderScreen(
                     trackColor = Color(0xFFE2E8F0),
                 )
                 Text(
-                    if (uiState.usageLoaded) "Использовано $used из ${uiState.recordingLimitMinutes} мин в этом месяце" else "Проверяем остаток лимита",
+                    if (uiState.usageLoaded) "Использовано $used из ${uiState.recordingLimitMinutes} мин в этом месяце" else "Загрузка…",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF64748B),
                 )

@@ -237,6 +237,7 @@ fun ConspectsScreen(
                             SubjectHeader(
                                 subject = subject,
                                 count = rows.size,
+                                lastLectureDate = rows.maxOfOrNull { it.completedAt }?.let { formatSubjectDate(it) }.orEmpty(),
                                 expanded = subject in expandedSubjects,
                                 onToggle = {
                                     expandedSubjects = if (subject in expandedSubjects) {
@@ -439,7 +440,17 @@ private fun formatConspectDate(value: String): String {
 }
 
 @Composable
-private fun SubjectHeader(subject: String, count: Int, expanded: Boolean, onToggle: () -> Unit) {
+private fun formatSubjectDate(value: String): String {
+    if (value.isBlank()) return ""
+    return runCatching {
+        DateTimeFormatter.ofPattern("d MMM", Locale("ru"))
+            .withZone(ZoneId.systemDefault())
+            .format(Instant.parse(value))
+    }.getOrElse { value.take(10) }
+}
+
+@Composable
+private fun SubjectHeader(subject: String, count: Int, lastLectureDate: String, expanded: Boolean, onToggle: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -471,7 +482,13 @@ private fun SubjectHeader(subject: String, count: Int, expanded: Boolean, onTogg
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    "$count ${conspectWord(count)}",
+                    buildString {
+                        append("$count ${conspectWord(count)}")
+                        if (lastLectureDate.isNotBlank()) {
+                            append(" · последняя ")
+                            append(lastLectureDate)
+                        }
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF64748B),
                 )
