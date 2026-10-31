@@ -570,7 +570,7 @@ class ApiClient(context: Context) {
             ApiResult.Ok(
                 UsageSummary(
                     recordingUsedMinutes = recording?.optInt("usedMinutes") ?: 0,
-                    recordingLimitMinutes = recording?.optInt("limitMinutes") ?: 300,
+                    recordingLimitMinutes = recording?.optInt("limitMinutes") ?: 180,
                     recordingRemainingMinutes = recording?.optInt("remainingMinutes") ?: 0,
                     qaUsed = qa?.optInt("used") ?: 0,
                     qaLimit = qa?.optInt("limit") ?: 10,

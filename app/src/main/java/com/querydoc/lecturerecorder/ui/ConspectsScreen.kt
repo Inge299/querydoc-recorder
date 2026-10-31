@@ -224,7 +224,7 @@ fun ConspectsScreen(
 
             else -> {
                 val subjectGroups = items
-                    .groupBy { it.subject.trim().ifBlank { "Без предмета" } }
+                    .groupBy { displaySubject(it.subject) }
                     .entries
                     .sortedWith(compareBy({ it.key == "Без предмета" }, { it.key }))
                 LazyColumn(
@@ -323,6 +323,12 @@ fun ConspectsScreen(
             },
         )
     }
+}
+
+private fun displaySubject(value: String): String {
+    val trimmed = value.trim()
+    if (trimmed.isBlank()) return "Без предмета"
+    return trimmed.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() }
 }
 
 private fun conspectWord(count: Int): String = when {
@@ -577,9 +583,9 @@ private fun ConspectRow(
                     Text(
                         text = when {
                             item.subject.isBlank() -> "Без предмета"
-                            item.subjectId.isBlank() -> "${item.subject} · подтвердить"
-                            else -> item.subject
-                        }.uppercase(),
+                            item.subjectId.isBlank() -> "${displaySubject(item.subject)} · подтвердить"
+                            else -> displaySubject(item.subject)
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         color = if (item.subjectId.isBlank()) Color(0xFFB45309) else Color(0xFF7C6AE8),
                         maxLines = 1,

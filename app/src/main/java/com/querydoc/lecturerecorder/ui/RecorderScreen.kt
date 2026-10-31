@@ -275,6 +275,59 @@ fun RecorderScreen(
             }
         }
 
+        if (uiState.statusText.contains("Не удалось") || uiState.statusText.contains("Нет сети") || uiState.statusText.contains("Ошибка")) {
+            Text(
+                uiState.statusText,
+                modifier = Modifier.padding(horizontal = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFFB91C1C),
+            )
+        }
+
+        Card(shape = sectionShape, modifier = Modifier.fillMaxWidth()) {
+            val limit = uiState.recordingLimitMinutes.coerceAtLeast(1)
+            val used = uiState.recordingUsedMinutes.coerceIn(0, limit)
+            val fraction = (used.toFloat() / limit.toFloat()).coerceIn(0f, 1f)
+            Column(
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Лимит записи", style = MaterialTheme.typography.labelMedium, color = Color(0xFF475569))
+                    Text(
+                        if (uiState.usageLoaded) "Осталось ${uiState.recordingRemainingMinutes} мин" else "Загрузка…",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (fraction > 0.9f) Color(0xFFDC2626) else Color(0xFF4338CA),
+                    )
+                }
+                LinearProgressIndicator(
+                    progress = { fraction },
+                    modifier = Modifier.fillMaxWidth().height(6.dp),
+                    color = if (fraction > 0.9f) Color(0xFFDC2626) else Color(0xFF4338CA),
+                    trackColor = Color(0xFFE2E8F0),
+                )
+                Text(
+                    if (uiState.usageLoaded) "Использовано $used из ${uiState.recordingLimitMinutes} мин в этом месяце" else "Проверяем остаток лимита",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color(0xFF64748B),
+                )
+            }
+        }
+
+        if (!uiState.hasMicPermission) {
+            Text(
+                "Нет доступа к микрофону. Разрешите запись в настройках Android.",
+                modifier = Modifier.padding(horizontal = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFFB91C1C),
+            )
+        }
+
         Card(shape = sectionShape, modifier = Modifier.fillMaxWidth()) {
             Row(
                 modifier = Modifier
@@ -780,7 +833,7 @@ private fun ControlButton(
     primary: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val diameter = if (primary) 58.dp else 48.dp
+    val diameter = if (primary) 76.dp else 60.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -799,7 +852,7 @@ private fun ControlButton(
                 imageVector = icon,
                 contentDescription = label,
                 tint = if (!enabled) Color(0xFF94A3B8) else if (primary) accent else accent,
-                modifier = Modifier.size(if (primary) 28.dp else 22.dp),
+                modifier = Modifier.size(if (primary) 36.dp else 26.dp),
             )
         }
         Text(

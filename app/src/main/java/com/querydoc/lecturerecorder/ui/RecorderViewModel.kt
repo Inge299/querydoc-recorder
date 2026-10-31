@@ -99,6 +99,7 @@ class RecorderViewModel(
         observeQueue()
         observePendingUploads()
         observeTelemetry()
+        refreshUsage()
         startStorageTicker()
     }
 
@@ -187,6 +188,7 @@ class RecorderViewModel(
         elapsedJob?.cancel()
         elapsedJob = null
         idleMicMonitor.start()
+        refreshUsage()
         _state.update {
             it.copy(
                 isRecording = false,
@@ -554,12 +556,31 @@ class RecorderViewModel(
         }
     }
 
+    fun refreshUsage() {
+        viewModelScope.launch {
+            when (val result = api.usage()) {
+                is ApiResult.Ok -> _state.update {
+                    it.copy(
+                        recordingUsedMinutes = result.value.recordingUsedMinutes,
+                        recordingLimitMinutes = result.value.recordingLimitMinutes,
+                        recordingRemainingMinutes = result.value.recordingRemainingMinutes,
+                        usageLoaded = true,
+                    )
+                }
+                is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
     private fun startStorageTicker() {
         storageJob?.cancel()
         storageJob = viewModelScope.launch {
+            var ticks = 0
             while (true) {
                 val remainingSec = estimateRemainingSeconds()
                 _state.update { it.copy(remainingRecordSeconds = remainingSec) }
+                if (ticks % 4 == 0) refreshUsage()
+                ticks += 1
                 delay(15_000L)
             }
         }
