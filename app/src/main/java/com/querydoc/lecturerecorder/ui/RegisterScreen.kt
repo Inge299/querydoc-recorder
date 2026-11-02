@@ -57,8 +57,10 @@ fun RegisterScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
 
     LaunchedEffect(stage, callCheckId) {
         if (stage != "call" || callCheckId.isBlank()) return@LaunchedEffect
-        while (true) {
+        var attempts = 0
+        while (attempts < 100) {
             delay(3_000L)
+            attempts += 1
             when (api.confirmRegistrationCall(phone, callCheckId)) {
                 is ApiResult.Ok -> {
                     when (val login = api.login(phone, password)) {
@@ -73,6 +75,8 @@ fun RegisterScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
                 is ApiResult.Failure -> Unit
             }
         }
+        error = "Не удалось подтвердить звонок. Попробуйте зарегистрироваться снова."
+        stage = "form"
     }
 
     AuthScreenShell(title = "Регистрация", subtitle = "Создайте аккаунт по номеру телефона", onBack = onBack) {
@@ -200,8 +204,10 @@ fun RecoveryScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
 
     LaunchedEffect(stage, callCheckId) {
         if (stage != "call" || callCheckId.isBlank()) return@LaunchedEffect
-        while (true) {
+        var attempts = 0
+        while (attempts < 100) {
             delay(3_000L)
+            attempts += 1
             when (api.confirmPasswordResetCall(phone, callCheckId)) {
                 is ApiResult.Ok -> {
                     stage = "password"
@@ -211,6 +217,8 @@ fun RecoveryScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
                 is ApiResult.Failure -> Unit
             }
         }
+        error = "Не удалось подтвердить звонок. Попробуйте восстановление снова."
+        stage = "form"
     }
 
     AuthScreenShell(title = "Восстановление доступа", subtitle = "Подтвердите телефон и задайте новый пароль", onBack = onBack) {
