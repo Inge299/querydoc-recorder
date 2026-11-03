@@ -5,58 +5,34 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Page shadow -->
+    <!-- soft brand glow -->
     <path
-        android:pathData="M40,26h38a8,8 0 0 1 8,8v46a8,8 0 0 1 -8,8h-38a8,8 0 0 1 -8,-8v-46a8,8 0 0 1 8,-8z"
-        android:fillColor="#050816"
-        android:fillAlpha="0.38" />
+        android:pathData="M54,16a30,30 0 0 1 30,30v18a30,30 0 0 1 -30,30a30,30 0 0 1 -30,-30v-18a30,30 0 0 1 30,-30z"
+        android:fillColor="#4338CA"
+        android:fillAlpha="0.35" />
 
-    <!-- Document page -->
+    <!-- microphone capsule -->
     <path
-        android:pathData="M36,22h38a8,8 0 0 1 8,8v46a8,8 0 0 1 -8,8h-38a8,8 0 0 1 -8,-8v-46a8,8 0 0 1 8,-8z"
+        android:pathData="M54,19a13,13 0 0 1 13,13v22a13,13 0 0 1 -26,0v-22a13,13 0 0 1 13,-13z"
         android:fillColor="#FFFFFF" />
 
-    <!-- Folded corner -->
-    <path
-        android:pathData="M64,22h10a8,8 0 0 1 8,8v10z"
-        android:fillColor="#C7D2FE" />
+    <!-- microphone grille -->
+    <path android:pathData="M46,34h16" android:strokeColor="#4338CA" android:strokeWidth="3" android:strokeLineCap="round" />
+    <path android:pathData="M46,42h16" android:strokeColor="#6366F1" android:strokeWidth="3" android:strokeLineCap="round" />
+    <path android:pathData="M46,50h16" android:strokeColor="#818CF8" android:strokeWidth="3" android:strokeLineCap="round" />
 
-    <!-- Text lines -->
+    <!-- stand -->
     <path
-        android:pathData="M38,40h24"
-        android:strokeColor="#94A3B8"
-        android:strokeWidth="3.2"
+        android:pathData="M37,53v5a17,17 0 0 0 34,0v-5"
+        android:strokeColor="#A5B4FC"
+        android:strokeWidth="3.5"
         android:strokeLineCap="round" />
-    <path
-        android:pathData="M38,48h18"
-        android:strokeColor="#CBD5E1"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M38,56h21"
-        android:strokeColor="#CBD5E1"
-        android:strokeWidth="3.2"
-        android:strokeLineCap="round" />
+    <path android:pathData="M54,75v8" android:strokeColor="#A5B4FC" android:strokeWidth="3.5" android:strokeLineCap="round" />
+    <path android:pathData="M45,84h18" android:strokeColor="#A5B4FC" android:strokeWidth="3.5" android:strokeLineCap="round" />
 
-    <!-- Audio waveform: the conspect is sound turned into notes -->
-    <path
-        android:pathData="M60,66v12"
-        android:strokeColor="#FBBF24"
-        android:strokeWidth="4"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M67,60v22"
-        android:strokeColor="#FBBF24"
-        android:strokeWidth="4"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M74,56v28"
-        android:strokeColor="#FBBF24"
-        android:strokeWidth="4"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M81,63v18"
-        android:strokeColor="#FCD34D"
-        android:strokeWidth="4"
-        android:strokeLineCap="round" />
+    <!-- sound wave -->
+    <path android:pathData="M79,45v18" android:strokeColor="#FBBF24" android:strokeWidth="3" android:strokeLineCap="round" />
+    <path android:pathData="M85,51v6" android:strokeColor="#FCD34D" android:strokeWidth="3" android:strokeLineCap="round" />
+    <path android:pathData="M28,47v10" android:strokeColor="#38BDF8" android:strokeWidth="3" android:strokeLineCap="round" />
+    <path android:pathData="M22,51v2" android:strokeColor="#7DD3FC" android:strokeWidth="3" android:strokeLineCap="round" />
 </vector>
