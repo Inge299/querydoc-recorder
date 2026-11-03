@@ -116,6 +116,16 @@ data class PlansPayload(
     val plans: List<PlanInfo>,
 )
 
+data class PaymentHistoryItem(
+    val id: String,
+    val planId: String,
+    val amountRub: Int,
+    val status: String,
+    val paidAt: String?,
+    val receiptStatus: String,
+    val receiptUrl: String,
+)
+
 data class StudyKit(
     val questions: List<StudyQuestion>,
     val checklist: List<String>,
@@ -600,6 +610,32 @@ class ApiClient(context: Context) {
                     studyKitRemaining = study?.optInt("remaining") ?: 0,
                 ),
             )
+        }
+    }
+
+    suspend fun payments(): ApiResult<List<PaymentHistoryItem>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/billing/payments").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось получить историю платежей", response.code >= 500)
+            }
+            val array = json.optJSONArray("payments") ?: JSONArray()
+            val values = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                PaymentHistoryItem(
+                    id = item.optString("id"),
+                    planId = item.optString("planId"),
+                    amountRub = item.optInt("amountRub"),
+                    status = item.optString("status"),
+                    paidAt = item.optString("paidAt").takeIf { it.isNotBlank() },
+                    receiptStatus = item.optString("receiptStatus"),
+                    receiptUrl = item.optString("receiptUrl"),
+                )
+            }
+            ApiResult.Ok(values)
         }
     }
 

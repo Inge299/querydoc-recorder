@@ -42,6 +42,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.PlanInfo
 import com.querydoc.lecturerecorder.data.remote.PlansPayload
+import com.querydoc.lecturerecorder.data.remote.PaymentHistoryItem
 import com.querydoc.lecturerecorder.diagnostics.Analytics
 import kotlinx.coroutines.launch
 
@@ -52,6 +53,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
     var payload by remember { mutableStateOf<PlansPayload?>(null) }
+    var payments by remember { mutableStateOf<List<PaymentHistoryItem>>(emptyList()) }
     var buyingId by remember { mutableStateOf("") }
 
     suspend fun reload() {
@@ -62,6 +64,10 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                 error = ""
             }
             is ApiResult.Failure -> error = result.message
+        }
+        when (val history = api.payments()) {
+            is ApiResult.Ok -> payments = history.value
+            is ApiResult.Failure -> Unit
         }
         loading = false
     }
@@ -110,6 +116,37 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
             if (error.isNotBlank()) {
                 Text(error, color = Color(0xFFB91C1C), style = MaterialTheme.typography.bodySmall)
             }
+            if (payments.isNotEmpty()) {
+                Text("История платежей", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
+                payments.forEach { payment ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(
+                                if (payment.amountRub == 0) "Тестовая активация" else "Оплата ${payment.amountRub} ₽",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                payment.paidAt?.take(10) ?: "Дата уточняется",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFF64748B),
+                            )
+                            if (payment.receiptUrl.isNotBlank()) {
+                                androidx.compose.material3.TextButton(onClick = {
+                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(payment.receiptUrl))) }
+                                }) { Text("Открыть чек") }
+                            } else if (payment.receiptStatus == "pending") {
+                                Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
+                            }
+                        }
+                    }
+                }
+            }
+
             payload?.let { data ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
