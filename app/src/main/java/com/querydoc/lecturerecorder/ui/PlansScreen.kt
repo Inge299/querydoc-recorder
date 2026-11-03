@@ -1,5 +1,7 @@
 package com.querydoc.lecturerecorder.ui
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -120,6 +122,12 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         if (data.testBilling) {
                             Text("Тестовый режим: оплата без реальных денег", color = Color(0xFFFBBF24), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
                         }
+                        Text(
+                            "После оплаты вернитесь в приложение и обновите тарифы",
+                            color = Color(0xFF9CA3AF),
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 6.dp),
+                        )
                     }
                 }
                 data.plans.forEach { plan ->
@@ -127,19 +135,30 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         plan = plan,
                         current = plan.id == data.currentPlanId,
                         testBilling = data.testBilling,
+                        billingReady = data.billingReady,
                         busy = buyingId == plan.id,
                         onBuy = {
-                            if (!data.testBilling) return@PlanCard
+                            if (!data.testBilling && !data.billingReady) return@PlanCard
                             Analytics.track(context, "pay_click", mapOf("planId" to plan.id))
                             buyingId = plan.id
                             scope.launch {
-                                when (val result = api.testPurchase(plan.id)) {
-                                    is ApiResult.Ok -> {
-                                        Toast.makeText(context, "Тестовый тариф активирован", Toast.LENGTH_SHORT).show()
-                                        reload()
-                                        onChanged()
+                                if (data.testBilling) {
+                                    when (val result = api.testPurchase(plan.id)) {
+                                        is ApiResult.Ok -> {
+                                            Toast.makeText(context, "Тестовый тариф активирован", Toast.LENGTH_SHORT).show()
+                                            reload()
+                                            onChanged()
+                                        }
+                                        is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
                                     }
-                                    is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                                } else {
+                                    when (val result = api.createPayment(plan.id)) {
+                                        is ApiResult.Ok -> {
+                                            Toast.makeText(context, "Открываем оплату на 30 дней", Toast.LENGTH_LONG).show()
+                                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.value))) }
+                                        }
+                                        is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                                    }
                                 }
                                 buyingId = ""
                             }
@@ -152,7 +171,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
 }
 
 @Composable
-private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, busy: Boolean, onBuy: () -> Unit) {
+private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, billingReady: Boolean, busy: Boolean, onBuy: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -170,13 +189,14 @@ private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, bus
             )
             Button(
                 onClick = onBuy,
-                enabled = !current && !busy && testBilling,
+                enabled = !current && !busy && (testBilling || billingReady),
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
             ) {
                 Text(when {
                     current -> "Текущий тариф"
                     busy -> "Активируем…"
                     testBilling -> "Активировать тестовый тариф"
+                    billingReady -> "Оплатить 30 дней"
                     else -> "Оплата скоро"
                 })
             }

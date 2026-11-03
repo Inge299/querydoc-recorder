@@ -112,6 +112,7 @@ data class PlansPayload(
     val currentPlanId: String,
     val currentPlanName: String,
     val testBilling: Boolean,
+    val billingReady: Boolean,
     val plans: List<PlanInfo>,
 )
 
@@ -632,8 +633,25 @@ class ApiClient(context: Context) {
                 currentPlanId = current?.optString("planId").orEmpty(),
                 currentPlanName = current?.optString("planName").orEmpty(),
                 testBilling = json.optBoolean("testBilling", false),
+                billingReady = json.optBoolean("billingReady", false),
                 plans = plans,
             ))
+        }
+    }
+
+    suspend fun createPayment(planId: String): ApiResult<String> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val body = JSONObject().put("planId", planId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/billing/create")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val url = json?.optString("confirmationUrl").orEmpty()
+            if (response.isSuccessful && url.isNotBlank()) ApiResult.Ok(url)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Не удалось создать платёж" }, response.code >= 500)
         }
     }
 
