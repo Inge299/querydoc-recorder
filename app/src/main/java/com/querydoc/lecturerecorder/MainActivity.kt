@@ -158,6 +158,12 @@ class MainActivity : ComponentActivity() {
             BackHandler(enabled = readerSession == null && showConspects) {
                 showConspects = false
             }
+            LaunchedEffect(recorderState.paywallRequested) {
+                if (recorderState.paywallRequested) {
+                    showPlans = true
+                    viewModel.dismissPaywall()
+                }
+            }
             LaunchedEffect(showSettings, showConspects, readerSession) {
                 if (!showSettings && !showConspects && readerSession == null) {
                     viewModel.refreshRecordings()

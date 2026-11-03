@@ -40,6 +40,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.PlanInfo
 import com.querydoc.lecturerecorder.data.remote.PlansPayload
+import com.querydoc.lecturerecorder.diagnostics.Analytics
 import kotlinx.coroutines.launch
 
 @Composable
@@ -63,7 +64,10 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
         loading = false
     }
 
-    LaunchedEffect(Unit) { reload() }
+    LaunchedEffect(Unit) {
+        Analytics.track(context, "paywall_view")
+        reload()
+    }
 
     Column(
         modifier = Modifier
@@ -126,6 +130,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         busy = buyingId == plan.id,
                         onBuy = {
                             if (!data.testBilling) return@PlanCard
+                            Analytics.track(context, "pay_click", mapOf("planId" to plan.id))
                             buyingId = plan.id
                             scope.launch {
                                 when (val result = api.testPurchase(plan.id)) {

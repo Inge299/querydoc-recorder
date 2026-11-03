@@ -247,10 +247,12 @@ class RecorderViewModel(
                         if (cached != null && result.status == 0) {
                             _state.update { it.copy(statusText = "Нет сети — показан сохранённый конспект") }
                         } else {
+                            val quotaError = result.code == "recording_quota_exceeded" || result.code == "session_too_long"
                             _state.update {
                                 it.copy(
-                                    statusText = "Не удалось открыть конспект",
-                                    conspectDialog = ConspectState(sessionId, "failed", "", result.message, 0),
+                                    statusText = if (quotaError) "Закончился лимит записи" else "Не удалось открыть конспект",
+                                    paywallRequested = quotaError,
+                                    conspectDialog = if (quotaError) null else ConspectState(sessionId, "failed", "", result.message, 0),
                                 )
                             }
                         }
@@ -292,6 +294,10 @@ class RecorderViewModel(
 
     fun dismissConspect() {
         _state.update { it.copy(conspectDialog = null) }
+    }
+
+    fun dismissPaywall() {
+        _state.update { it.copy(paywallRequested = false) }
     }
 
     fun playRecordingById(id: String, startFraction: Float?) {
