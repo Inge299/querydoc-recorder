@@ -96,6 +96,25 @@ data class UsageSummary(
     val studyKitRemaining: Int,
 )
 
+data class PlanInfo(
+    val id: String,
+    val name: String,
+    val priceMonthly: Int,
+    val priceAnnual: Int,
+    val monthlyRecordingMinutes: Int,
+    val maxSessionMinutes: Int,
+    val dailyQa: Int,
+    val dailyStudyKit: Int,
+    val storageDays: Int,
+)
+
+data class PlansPayload(
+    val currentPlanId: String,
+    val currentPlanName: String,
+    val testBilling: Boolean,
+    val plans: List<PlanInfo>,
+)
+
 data class StudyKit(
     val questions: List<StudyQuestion>,
     val checklist: List<String>,
@@ -580,6 +599,56 @@ class ApiClient(context: Context) {
                     studyKitRemaining = study?.optInt("remaining") ?: 0,
                 ),
             )
+        }
+    }
+
+    suspend fun plans(): ApiResult<PlansPayload> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/plans").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось получить тарифы", response.code >= 500)
+            }
+            val current = json.optJSONObject("current")
+            val array = json.optJSONArray("plans") ?: JSONArray()
+            val plans = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                val limits = item.optJSONObject("limits")
+                PlanInfo(
+                    id = item.optString("id"),
+                    name = item.optString("name"),
+                    priceMonthly = item.optInt("priceMonthly"),
+                    priceAnnual = item.optInt("priceAnnual"),
+                    monthlyRecordingMinutes = limits?.optInt("monthlyRecordingMinutes") ?: 0,
+                    maxSessionMinutes = limits?.optInt("maxSessionMinutes") ?: 0,
+                    dailyQa = limits?.optInt("dailyQa") ?: 0,
+                    dailyStudyKit = limits?.optInt("dailyStudyKit") ?: 0,
+                    storageDays = limits?.optInt("storageDays") ?: 0,
+                )
+            }
+            ApiResult.Ok(PlansPayload(
+                currentPlanId = current?.optString("planId").orEmpty(),
+                currentPlanName = current?.optString("planName").orEmpty(),
+                testBilling = json.optBoolean("testBilling", false),
+                plans = plans,
+            ))
+        }
+    }
+
+    suspend fun testPurchase(planId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val body = JSONObject().put("planId", planId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/billing/test")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Не удалось выполнить тестовый платёж" }, response.code >= 500)
         }
     }
 

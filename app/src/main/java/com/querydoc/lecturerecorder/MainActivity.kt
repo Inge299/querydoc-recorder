@@ -33,6 +33,7 @@ import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LegalScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
 import com.querydoc.lecturerecorder.ui.OnboardingScreen
+import com.querydoc.lecturerecorder.ui.PlansScreen
 import com.querydoc.lecturerecorder.ui.RecoveryScreen
 import com.querydoc.lecturerecorder.ui.RegisterScreen
 import com.querydoc.lecturerecorder.ui.RecorderScreen
@@ -77,6 +78,7 @@ class MainActivity : ComponentActivity() {
             var restoreAttempted by remember { mutableStateOf(false) }
             var showConspects by rememberSaveable { mutableStateOf(false) }
             var showSettings by rememberSaveable { mutableStateOf(false) }
+            var showPlans by rememberSaveable { mutableStateOf(false) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
@@ -126,6 +128,7 @@ class MainActivity : ComponentActivity() {
                 !onboardingDone -> "onboarding"
                 showLegal -> "legal"
                 readerSession != null -> "reader"
+                showPlans -> "plans"
                 showSettings -> "settings"
                 showConspects -> "conspects"
                 else -> "recorder"
@@ -145,6 +148,9 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showLegal) {
                 showLegal = false
+            }
+            BackHandler(enabled = showPlans) {
+                showPlans = false
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
@@ -212,6 +218,7 @@ class MainActivity : ComponentActivity() {
                                 onSetEnvironmentProfile = viewModel::setEnvironmentProfile,
                                 onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
                                 onOpenLegal = { showLegal = true },
+                                onOpenPlans = { showPlans = true },
                                 onDeleteAccount = { password, callback ->
                                     scope.launch {
                                         when (val result = api.deleteAccount(password)) {
@@ -228,6 +235,11 @@ class MainActivity : ComponentActivity() {
                                     scope.launch { api.logout(); loggedIn = false }
                                 },
                                 onBack = { showSettings = false },
+                            )
+                            "plans" -> PlansScreen(
+                                api = api,
+                                onBack = { showPlans = false },
+                                onChanged = { viewModel.refreshUsage() },
                             )
                             "conspects" -> ConspectsScreen(
                                 api = api,

@@ -73,6 +73,7 @@ fun SettingsScreen(
     onSetRecognitionLanguage: (RecognitionLanguage) -> Unit,
     onLogout: () -> Unit,
     onOpenLegal: () -> Unit,
+    onOpenPlans: () -> Unit,
     onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -180,6 +181,13 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "ЛИМИТЫ") {
+                SettingRow(
+                    icon = Icons.Filled.Info,
+                    title = "Тарифы и лимиты",
+                    subtitle = "Сравнить планы и возможности",
+                    onClick = onOpenPlans,
+                )
+                SettingDivider()
                 val current = usage
                 if (current == null) {
                     Text(
