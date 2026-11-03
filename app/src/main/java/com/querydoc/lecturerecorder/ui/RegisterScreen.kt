@@ -32,6 +32,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
+import com.querydoc.lecturerecorder.diagnostics.Analytics
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -64,7 +65,10 @@ fun RegisterScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
             when (api.confirmRegistrationCall(phone, callCheckId)) {
                 is ApiResult.Ok -> {
                     when (val login = api.login(phone, password)) {
-                        is ApiResult.Ok -> onCompleted()
+                        is ApiResult.Ok -> {
+                            Analytics.track(context, "registration_completed")
+                            onCompleted()
+                        }
                         is ApiResult.Failure -> {
                             error = login.message
                             stage = "form"

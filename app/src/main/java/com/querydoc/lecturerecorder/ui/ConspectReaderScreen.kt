@@ -118,6 +118,10 @@ fun ConspectReaderScreen(
     var showStudyKit by remember { mutableStateOf(false) }
     var qaMessages by remember(sessionId) { mutableStateOf(listOf<QaMessage>()) }
 
+    LaunchedEffect(sessionId) {
+        Analytics.track(context, "conspect_open")
+    }
+
     LaunchedEffect(reload) {
         val cached = ConspectCache.get(context, sessionId)
         if (markdown.isBlank() && cached != null) markdown = cached
