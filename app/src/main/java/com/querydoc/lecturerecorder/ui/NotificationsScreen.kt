@@ -45,7 +45,7 @@ import com.querydoc.lecturerecorder.diagnostics.Analytics
 import kotlinx.coroutines.launch
 
 @Composable
-fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> Unit) {
+fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> Unit, onUnreadChanged: (Int) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
@@ -59,6 +59,7 @@ fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> U
             is ApiResult.Ok -> {
                 items = result.value.notifications
                 unread = result.value.unread
+                onUnreadChanged(result.value.unread)
                 error = ""
             }
             is ApiResult.Failure -> error = result.message
@@ -102,9 +103,14 @@ fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> U
             Text(if (unread > 0) "Непрочитанных: $unread" else "Все прочитано", color = Color(0xFF64748B), style = MaterialTheme.typography.bodySmall)
             if (unread > 0) {
                 TextButton(onClick = {
+                    val unreadIds = items.filter { it.readAt == null }.map { it.id }
+                    items = items.map { if (it.readAt == null) it.copy(readAt = "read") else it }
+                    unread = 0
+                    onUnreadChanged(0)
                     scope.launch {
-                        api.markNotificationsRead(emptyList())
-                        reload()
+                        if (unreadIds.isNotEmpty()) {
+                            runCatching { api.markNotificationsRead(unreadIds) }
+                        }
                     }
                 }) { Text("Прочитать все") }
             }

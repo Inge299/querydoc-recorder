@@ -14,7 +14,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -34,10 +37,17 @@ fun NotificationBell(unread: Int, onClick: () -> Unit, tint: Color = Color(0xFF4
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    if (unread > 99) "99+" else unread.toString(),
+                    text = if (unread > 99) "99+" else unread.toString(),
                     color = Color.White,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    style = TextStyle(
+                        fontSize = 9.sp,
+                        lineHeight = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        platformStyle = PlatformTextStyle(includeFontPadding = false),
+                    ),
+                    modifier = Modifier.align(Alignment.Center),
                 )
             }
         }

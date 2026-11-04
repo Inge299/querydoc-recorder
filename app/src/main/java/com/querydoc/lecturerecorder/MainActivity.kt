@@ -266,6 +266,7 @@ class MainActivity : ComponentActivity() {
                                 api = api,
                                 onBack = { showNotifications = false },
                                 onOpenPlans = { showNotifications = false; showPlans = true },
+                                onUnreadChanged = { unreadNotifications = it },
                             )
                             "plans" -> PlansScreen(
                                 api = api,
