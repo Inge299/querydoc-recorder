@@ -32,6 +32,7 @@ import com.querydoc.lecturerecorder.ui.ConspectsScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LegalScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
+import com.querydoc.lecturerecorder.ui.NotificationsScreen
 import com.querydoc.lecturerecorder.ui.OnboardingScreen
 import com.querydoc.lecturerecorder.ui.PlansScreen
 import com.querydoc.lecturerecorder.ui.RecoveryScreen
@@ -80,6 +81,7 @@ class MainActivity : ComponentActivity() {
             var showConspects by rememberSaveable { mutableStateOf(false) }
             var showSettings by rememberSaveable { mutableStateOf(false) }
             var showPlans by rememberSaveable { mutableStateOf(false) }
+            var showNotifications by rememberSaveable { mutableStateOf(false) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
@@ -131,6 +133,7 @@ class MainActivity : ComponentActivity() {
                 showLegal -> "legal"
                 readerSession != null -> "reader"
                 showPlans -> "plans"
+                showNotifications -> "notifications"
                 showSettings -> "settings"
                 showConspects -> "conspects"
                 else -> "recorder"
@@ -153,6 +156,9 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showPlans) {
                 showPlans = false
+            }
+            BackHandler(enabled = showNotifications) {
+                showNotifications = false
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
@@ -227,6 +233,7 @@ class MainActivity : ComponentActivity() {
                                 onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
                                 onOpenLegal = { showLegal = true },
                                 onOpenPlans = { showPlans = true },
+                                onOpenNotifications = { showNotifications = true },
                                 onDeleteAccount = { password, callback ->
                                     scope.launch {
                                         when (val result = api.deleteAccount(password)) {
@@ -243,6 +250,11 @@ class MainActivity : ComponentActivity() {
                                     scope.launch { api.logout(); loggedIn = false }
                                 },
                                 onBack = { showSettings = false },
+                            )
+                            "notifications" -> NotificationsScreen(
+                                api = api,
+                                onBack = { showNotifications = false },
+                                onOpenPlans = { showNotifications = false; showPlans = true },
                             )
                             "plans" -> PlansScreen(
                                 api = api,

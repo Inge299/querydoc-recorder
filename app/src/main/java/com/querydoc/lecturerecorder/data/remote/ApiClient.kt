@@ -116,6 +116,24 @@ data class PlansPayload(
     val plans: List<PlanInfo>,
 )
 
+data class InboxNotification(
+    val id: String,
+    val kind: String,
+    val title: String,
+    val body: String,
+    val action: String,
+    val actionUrl: String,
+    val priority: String,
+    val paymentId: String,
+    val readAt: String?,
+    val createdAt: String?,
+)
+
+data class InboxPayload(
+    val unread: Int,
+    val notifications: List<InboxNotification>,
+)
+
 data class AdminAlert(
     val id: String,
     val type: String,
@@ -625,6 +643,50 @@ class ApiClient(context: Context) {
                     studyKitRemaining = study?.optInt("remaining") ?: 0,
                 ),
             )
+        }
+    }
+
+    suspend fun notifications(): ApiResult<InboxPayload> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/notifications").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось получить уведомления" }, response.code >= 500)
+            }
+            val array = json.optJSONArray("notifications") ?: JSONArray()
+            val items = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                InboxNotification(
+                    id = item.optString("id"),
+                    kind = item.optString("kind"),
+                    title = item.optString("title"),
+                    body = item.optString("body"),
+                    action = item.optString("action"),
+                    actionUrl = item.optString("actionUrl"),
+                    priority = item.optString("priority"),
+                    paymentId = item.optString("paymentId"),
+                    readAt = item.optString("readAt").takeIf { it.isNotBlank() },
+                    createdAt = item.optString("createdAt").takeIf { it.isNotBlank() },
+                )
+            }
+            ApiResult.Ok(InboxPayload(json.optInt("unread"), items))
+        }
+    }
+
+    suspend fun markNotificationsRead(ids: List<String>): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext ApiResult.Ok(Unit)
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val body = JSONObject().put("ids", org.json.JSONArray(ids)).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/notifications/read")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", "Не удалось отметить уведомления", response.code >= 500)
         }
     }
 

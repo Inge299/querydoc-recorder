@@ -21,9 +21,9 @@ class AdminAlertsWorker(
     override suspend fun doWork(): Result {
         val api = ApiClient(applicationContext)
         if (!api.hasSession()) return Result.success()
-        return when (val result = api.adminAlerts()) {
+        return when (val result = api.notifications()) {
             is ApiResult.Ok -> {
-                val unread = result.value.alerts.filter { it.readAt == null }
+                val unread = result.value.notifications.filter { it.readAt == null && it.kind == "payment" && it.priority == "high" }
                 if (unread.isEmpty()) return Result.success()
                 if (ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                     return Result.success()
@@ -46,7 +46,7 @@ class AdminAlertsWorker(
                         .build()
                     manager.notify(alert.id.hashCode(), notification)
                 }
-                api.markAdminAlertsRead(unread.map { it.id })
+                api.markNotificationsRead(unread.map { it.id })
                 Result.success()
             }
             is ApiResult.Failure -> if (result.status == 401 || result.status == 403) Result.success() else Result.retry()

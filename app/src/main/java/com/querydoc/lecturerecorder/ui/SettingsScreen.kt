@@ -74,6 +74,7 @@ fun SettingsScreen(
     onLogout: () -> Unit,
     onOpenLegal: () -> Unit,
     onOpenPlans: () -> Unit,
+    onOpenNotifications: () -> Unit,
     onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -181,6 +182,13 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "ЛИМИТЫ") {
+                SettingRow(
+                    icon = Icons.Filled.Notifications,
+                    title = "Уведомления",
+                    subtitle = "Платежи и обновления",
+                    onClick = onOpenNotifications,
+                )
+                SettingDivider()
                 SettingRow(
                     icon = Icons.Filled.Info,
                     title = "Тарифы и лимиты",
