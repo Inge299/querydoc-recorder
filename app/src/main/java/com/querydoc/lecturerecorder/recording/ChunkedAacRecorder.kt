@@ -246,7 +246,8 @@ class ChunkedAacRecorder(
         }
         noiseFloor = (noiseFloor * (1f - floorAlpha) + rms * floorAlpha).coerceIn(0.005f, floorMax)
         val voiceOnly = ((rms - noiseFloor) / (1f - noiseFloor)).coerceIn(0f, 1f)
-        smoothedAverage = (smoothedAverage * 0.9f + voiceOnly * 0.1f).coerceIn(0f, 1f)
+        val displayLevel = MicLevel.fromRms(rms)
+        smoothedAverage = (smoothedAverage * 0.9f + displayLevel * 0.1f).coerceIn(0f, 1f)
         val baseTarget = if (farLecturerMode) 0.58f else 0.45f
         val target = when (environmentProfile) {
             EnvironmentProfile.QUIET -> baseTarget + 0.04f
@@ -265,8 +266,8 @@ class ChunkedAacRecorder(
         sumVoiceLevel += voiceOnly * read
         sumGain += smoothedAgcGain * read
         if (voiceOnly > peakVoiceLevel) peakVoiceLevel = voiceOnly
-        RecordingTelemetry.updateSoundLevel(softLimit(voiceOnly * smoothedAgcGain * 1.3f))
-        RecordingTelemetry.updateAverageSoundLevel(softLimit(smoothedAverage * smoothedAgcGain * 1.25f))
+        RecordingTelemetry.updateSoundLevel(softLimit(displayLevel))
+        RecordingTelemetry.updateAverageSoundLevel(softLimit(smoothedAverage))
         RecordingTelemetry.updateAgcGain(smoothedAgcGain)
         return smoothedAgcGain
     }

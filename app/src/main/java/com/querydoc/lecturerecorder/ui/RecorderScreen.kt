@@ -806,9 +806,9 @@ private fun RecordingItemRow(
 }
 
 private fun levelWord(level: Float): String = when {
-    level < 0.005f -> "Тишина"
-    level < 0.08f -> "Тихо"
-    level < 0.75f -> "Хороший уровень"
+    level < 0.02f -> "Тишина"
+    level < 0.18f -> "Тихо"
+    level < 0.82f -> "Хороший уровень"
     else -> "Громко"
 }
 
@@ -963,8 +963,8 @@ private fun LevelBar(label: String, level: Float, average: Float, color: Color) 
 
 private fun levelColor(level: Float): Color {
     return when {
-        level < 0.2f -> Color(0xFFF59E0B)
-        level < 0.75f -> Color(0xFF22C55E)
+        level < 0.18f -> Color(0xFFF59E0B)
+        level < 0.82f -> Color(0xFF22C55E)
         else -> Color(0xFFEF4444)
     }
 }

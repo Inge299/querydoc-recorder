@@ -103,7 +103,8 @@ class IdleMicLevelMonitor(
                     }
                     noiseFloor = (noiseFloor * (1f - floorAlpha) + rms * floorAlpha).coerceIn(0.005f, floorMax)
                     val voiceOnly = ((rms - noiseFloor) / (1f - noiseFloor)).coerceIn(0f, 1f)
-                    smoothedAverage = (smoothedAverage * 0.9f + voiceOnly * 0.1f).coerceIn(0f, 1f)
+                    val displayLevel = MicLevel.fromRms(rms)
+                    smoothedAverage = (smoothedAverage * 0.9f + displayLevel * 0.1f).coerceIn(0f, 1f)
                     val baseTarget = if (farLecturerMode) 0.58f else 0.45f
                     val target = when (environmentProfile) {
                         EnvironmentProfile.QUIET -> baseTarget + 0.04f
@@ -118,8 +119,8 @@ class IdleMicLevelMonitor(
                     }.coerceAtLeast(1.8f)
                     val desiredGain = if (voiceOnly < 0.02f) 1f else (target / voiceOnly).coerceIn(0.8f, maxGain)
                     smoothedAgcGain = (smoothedAgcGain * 0.92f + desiredGain * 0.08f).coerceIn(0.8f, maxGain)
-                    RecordingTelemetry.updateSoundLevel(softLimit(voiceOnly * smoothedAgcGain))
-                    RecordingTelemetry.updateAverageSoundLevel(softLimit(smoothedAverage * smoothedAgcGain))
+                    RecordingTelemetry.updateSoundLevel(softLimit(displayLevel))
+                    RecordingTelemetry.updateAverageSoundLevel(softLimit(smoothedAverage))
                     RecordingTelemetry.updateAgcGain(smoothedAgcGain)
                 }
             } catch (_: Throwable) {
