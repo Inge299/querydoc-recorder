@@ -60,6 +60,13 @@ fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> U
                 items = result.value.notifications
                 unread = result.value.unread
                 onUnreadChanged(result.value.unread)
+                if (result.value.unread > 0) {
+                    // Opening the inbox counts as reading: persist it and clear the badge.
+                    runCatching { api.markNotificationsRead(emptyList()) }
+                    items = items.map { if (it.readAt == null) it.copy(readAt = "read") else it }
+                    unread = 0
+                    onUnreadChanged(0)
+                }
                 error = ""
             }
             is ApiResult.Failure -> error = result.message

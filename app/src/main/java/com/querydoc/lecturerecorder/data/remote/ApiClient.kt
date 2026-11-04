@@ -676,12 +676,11 @@ class ApiClient(context: Context) {
     }
 
     suspend fun markNotificationsRead(ids: List<String>): ApiResult<Unit> = withContext(Dispatchers.IO) {
-        if (ids.isEmpty()) return@withContext ApiResult.Ok(Unit)
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
-        val body = JSONObject().put("ids", org.json.JSONArray(ids)).toString()
+        // Mark all unread via GET: avoids request-body/Content-Type differences on some devices.
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/notifications/read")
-            .post(body.toRequestBody(JSON))
+            .get()
             .build()
         val response = execute(request) ?: return@withContext networkFailure()
         response.use { response ->
