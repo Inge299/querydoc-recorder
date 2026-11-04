@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
             var showSettings by rememberSaveable { mutableStateOf(false) }
             var showPlans by rememberSaveable { mutableStateOf(false) }
             var showNotifications by rememberSaveable { mutableStateOf(false) }
+            var unreadNotifications by remember { mutableStateOf(0) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
             LaunchedEffect(Unit) {
@@ -172,6 +173,14 @@ class MainActivity : ComponentActivity() {
                     viewModel.dismissPaywall()
                 }
             }
+            LaunchedEffect(loggedIn, showNotifications) {
+                if (loggedIn) {
+                    when (val inbox = api.notifications()) {
+                        is ApiResult.Ok -> unreadNotifications = inbox.value.unread
+                        is ApiResult.Failure -> Unit
+                    }
+                }
+            }
             LaunchedEffect(showSettings, showConspects, readerSession) {
                 if (!showSettings && !showConspects && readerSession == null) {
                     viewModel.refreshRecordings()
@@ -216,7 +225,9 @@ class MainActivity : ComponentActivity() {
                             onRequestConspect = viewModel::requestConspect,
                             onDismissConspect = viewModel::dismissConspect,
                             onOpenConspects = { showConspects = true },
-                            onOpenSettings = { showSettings = true }
+                            onOpenSettings = { showSettings = true },
+                            unreadNotifications = unreadNotifications,
+                            onOpenNotifications = { showNotifications = true }
                         )
                             "legal" -> LegalScreen(onBack = { showLegal = false })
                             "settings" -> SettingsScreen(
@@ -269,6 +280,8 @@ class MainActivity : ComponentActivity() {
                                     readerMarkdown = summary.markdown
                                     readerSession = summary.sessionId
                                 },
+                                unreadNotifications = unreadNotifications,
+                                onOpenNotifications = { showNotifications = true },
                             )
                             "reader" -> ConspectReaderScreen(
                                 api = api,

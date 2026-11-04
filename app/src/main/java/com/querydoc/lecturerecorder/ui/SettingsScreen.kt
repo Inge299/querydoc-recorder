@@ -123,6 +123,15 @@ fun SettingsScreen(
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            SettingsSection(title = "СООБЩЕНИЯ") {
+                SettingRow(
+                    icon = Icons.Filled.Notifications,
+                    title = "Уведомления",
+                    subtitle = "Платежи и обновления",
+                    onClick = onOpenNotifications,
+                )
+            }
+
             SettingsSection(title = "ЗАПИСЬ") {
                 SettingRow(
                     icon = Icons.Filled.Mic,
@@ -182,13 +191,6 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "ЛИМИТЫ") {
-                SettingRow(
-                    icon = Icons.Filled.Notifications,
-                    title = "Уведомления",
-                    subtitle = "Платежи и обновления",
-                    onClick = onOpenNotifications,
-                )
-                SettingDivider()
                 SettingRow(
                     icon = Icons.Filled.Info,
                     title = "Тарифы и лимиты",

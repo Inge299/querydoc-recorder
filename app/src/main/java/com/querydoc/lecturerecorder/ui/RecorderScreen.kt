@@ -117,7 +117,9 @@ fun RecorderScreen(
     onRequestConspect: (String) -> Unit,
     onDismissConspect: () -> Unit,
     onOpenConspects: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    unreadNotifications: Int,
+    onOpenNotifications: () -> Unit
 ) {
     val uiState by state.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
@@ -229,16 +231,23 @@ fun RecorderScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    IconButton(
-                        modifier = Modifier.size(32.dp),
-                        onClick = onOpenSettings,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Настройки",
+                    Row(verticalAlignment = Alignment.Top) {
+                        NotificationBell(
+                            unread = unreadNotifications,
+                            onClick = onOpenNotifications,
                             tint = Color(0xFFDDEAFD),
-                            modifier = Modifier.size(18.dp)
                         )
+                        IconButton(
+                            modifier = Modifier.size(32.dp),
+                            onClick = onOpenSettings,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Settings,
+                                contentDescription = "Настройки",
+                                tint = Color(0xFFDDEAFD),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
                 }
             }
