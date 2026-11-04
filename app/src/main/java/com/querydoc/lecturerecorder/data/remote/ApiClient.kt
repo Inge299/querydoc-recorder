@@ -116,6 +116,21 @@ data class PlansPayload(
     val plans: List<PlanInfo>,
 )
 
+data class AdminAlert(
+    val id: String,
+    val type: String,
+    val title: String,
+    val body: String,
+    val paymentId: String,
+    val readAt: String?,
+    val createdAt: String?,
+)
+
+data class AdminAlertsPayload(
+    val unread: Int,
+    val alerts: List<AdminAlert>,
+)
+
 data class PaymentHistoryItem(
     val id: String,
     val planId: String,
@@ -610,6 +625,47 @@ class ApiClient(context: Context) {
                     studyKitRemaining = study?.optInt("remaining") ?: 0,
                 ),
             )
+        }
+    }
+
+    suspend fun adminAlerts(): ApiResult<AdminAlertsPayload> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/admin/alerts").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось получить уведомления" }, response.code >= 500)
+            }
+            val array = json.optJSONArray("alerts") ?: JSONArray()
+            val alerts = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                AdminAlert(
+                    id = item.optString("id"),
+                    type = item.optString("type"),
+                    title = item.optString("title"),
+                    body = item.optString("body"),
+                    paymentId = item.optString("paymentId"),
+                    readAt = item.optString("readAt").takeIf { it.isNotBlank() },
+                    createdAt = item.optString("createdAt").takeIf { it.isNotBlank() },
+                )
+            }
+            ApiResult.Ok(AdminAlertsPayload(json.optInt("unread"), alerts))
+        }
+    }
+
+    suspend fun markAdminAlertsRead(ids: List<String>): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (ids.isEmpty()) return@withContext ApiResult.Ok(Unit)
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val body = JSONObject().put("ids", org.json.JSONArray(ids)).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/admin/alerts/read")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", "Не удалось отметить уведомления", response.code >= 500)
         }
     }
 

@@ -39,6 +39,7 @@ import com.querydoc.lecturerecorder.ui.RegisterScreen
 import com.querydoc.lecturerecorder.ui.RecorderScreen
 import com.querydoc.lecturerecorder.ui.RecorderViewModel
 import com.querydoc.lecturerecorder.ui.SettingsScreen
+import com.querydoc.lecturerecorder.work.AdminAlertsScheduler
 import com.querydoc.lecturerecorder.work.CleanupScheduler
 import com.querydoc.lecturerecorder.work.ConspectCache
 import com.querydoc.lecturerecorder.work.ConspectScheduler
@@ -101,6 +102,7 @@ class MainActivity : ComponentActivity() {
                     }
                     UploadScheduler.enqueue(applicationContext)
                     CleanupScheduler.enqueue(applicationContext)
+                    AdminAlertsScheduler.schedule(applicationContext)
                     if (!permissionsRequested && onboardingDone) {
                         permissionsRequested = true
                         permissionLauncher.launch(
