@@ -256,9 +256,11 @@ class RecorderViewModel(
                                 )
                             }
                         }
+                        refreshUsage()
                         return@launch
                     }
                 }
+                refreshUsage()
                 var polls = 0
                 while (current != null && current.status != "completed" && current.status != "failed" && polls < 150) {
                     delay(4_000)
@@ -281,8 +283,10 @@ class RecorderViewModel(
                 if (finalState != null && finalState.status == "completed") {
                     ConspectCache.save(app, sessionId, finalState.markdown)
                     _state.update { it.copy(statusText = "Конспект готов", conspectDialog = finalState) }
+                    refreshUsage()
                 } else if (finalState != null && finalState.status == "failed") {
                     _state.update { it.copy(statusText = "Конспект не готов", conspectDialog = finalState) }
+                    refreshUsage()
                 } else {
                     _state.update { it.copy(statusText = "Конспект готовится дольше обычного") }
                 }
