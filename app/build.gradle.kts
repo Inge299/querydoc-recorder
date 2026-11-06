@@ -61,6 +61,7 @@ android {
         getByName("debug") {
             applicationIdSuffix = if (devBuild) ".dev" else ".beta"
             versionNameSuffix = if (devBuild) "-dev" else "-beta.1"
+            resValue("string", "app_name", if (devBuild) "QueryDoc Dev" else "QueryDoc Beta")
         }
         release {
             // Никогда не подписываем release debug-ключом. Без keystore
