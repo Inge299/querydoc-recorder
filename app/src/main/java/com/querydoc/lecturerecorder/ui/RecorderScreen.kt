@@ -155,6 +155,13 @@ fun RecorderScreen(
         if (selectedMap.none { it.value }) selectionMode = false
     }
 
+    LaunchedEffect(uiState.importState?.stage) {
+        if (uiState.importState?.stage == ImportStage.READY) {
+            delay(8_000)
+            onDismissImport()
+        }
+    }
+
     LaunchedEffect(uiState.isPlayingLocalAudio, uiState.currentPlaybackItemId) {
         if (uiState.isPlayingLocalAudio) {
             lastPlayingItemId = uiState.currentPlaybackItemId
@@ -373,14 +380,6 @@ fun RecorderScreen(
             Text("Импорт лекции из файла", modifier = Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
         }
 
-        uiState.importState?.let { importState ->
-            ImportProgressCard(
-                state = importState,
-                onOpenConspects = onOpenConspects,
-                onDismiss = onDismissImport,
-            )
-        }
-
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -472,6 +471,14 @@ fun RecorderScreen(
                             }
                         }
                     }
+                }
+
+                uiState.importState?.let { importState ->
+                    ImportProgressCard(
+                        state = importState,
+                        onOpenConspects = onOpenConspects,
+                        onDismiss = onDismissImport,
+                    )
                 }
 
                 val visibleRecordings = uiState.recordings.filterNot { it.stage == RecordingStage.RECOGNIZED }
