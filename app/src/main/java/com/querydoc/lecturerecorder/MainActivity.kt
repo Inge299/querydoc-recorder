@@ -29,6 +29,7 @@ import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.diagnostics.CrashReporter
 import com.querydoc.lecturerecorder.ui.ConspectReaderScreen
 import com.querydoc.lecturerecorder.ui.ConspectsScreen
+import com.querydoc.lecturerecorder.ui.ImportAudioScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LegalScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
@@ -84,6 +85,7 @@ class MainActivity : ComponentActivity() {
             var showPlans by rememberSaveable { mutableStateOf(false) }
             var showNotifications by rememberSaveable { mutableStateOf(false) }
             var showSupport by rememberSaveable { mutableStateOf(false) }
+            var showImport by rememberSaveable { mutableStateOf(false) }
             var unreadNotifications by remember { mutableStateOf(0) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
@@ -136,6 +138,7 @@ class MainActivity : ComponentActivity() {
                 showLegal -> "legal"
                 readerSession != null -> "reader"
                 showPlans -> "plans"
+                showImport -> "import"
                 showSupport -> "support"
                 showNotifications -> "notifications"
                 showSettings -> "settings"
@@ -166,6 +169,9 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showSupport) {
                 showSupport = false
+            }
+            BackHandler(enabled = showImport) {
+                showImport = false
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
@@ -252,6 +258,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenPlans = { showPlans = true },
                                 onOpenNotifications = { showNotifications = true },
                                 onOpenSupport = { showSupport = true },
+                                onOpenImport = { showImport = true },
                                 onDeleteAccount = { password, callback ->
                                     scope.launch {
                                         when (val result = api.deleteAccount(password)) {
@@ -268,6 +275,11 @@ class MainActivity : ComponentActivity() {
                                     scope.launch { api.logout(); loggedIn = false }
                                 },
                                 onBack = { showSettings = false },
+                            )
+                            "import" -> ImportAudioScreen(
+                                api = api,
+                                onBack = { showImport = false },
+                                onOpenConspects = { showImport = false; showConspects = true },
                             )
                             "support" -> SupportScreen(
                                 api = api,
