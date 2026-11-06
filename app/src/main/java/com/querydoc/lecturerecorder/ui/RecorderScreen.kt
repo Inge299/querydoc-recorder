@@ -258,7 +258,11 @@ fun RecorderScreen(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                 verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
-                val meterColor = levelColor(uiState.soundLevel)
+                val meterColor = if (uiState.isRecording && !uiState.isRecordingPaused) {
+                    levelColor(uiState.soundLevel)
+                } else {
+                    Color(0xFF94A3B8)
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,

@@ -449,18 +449,6 @@ private fun LectureQaContent(
     }
 
     Box(modifier = modifier.fillMaxSize().imePadding()) {
-        if (messages.isNotEmpty()) {
-            TextButton(
-                onClick = {
-                    showQuestions = true
-                    scope.launch { listState.animateScrollToItem(0) }
-                },
-                modifier = Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 2.dp).background(Color(0xFFF4F6FB)),
-            ) {
-                Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
-                Text("К вопросам", style = MaterialTheme.typography.labelMedium)
-            }
-        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(bottom = 76.dp),
@@ -550,6 +538,19 @@ private fun LectureQaContent(
                 item(key = "qa_error") {
                     Text(error, style = MaterialTheme.typography.bodySmall, color = Color(0xFFDC2626))
                 }
+            }
+        }
+
+        if (messages.isNotEmpty()) {
+            TextButton(
+                onClick = {
+                    showQuestions = true
+                    scope.launch { listState.animateScrollToItem(0) }
+                },
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 2.dp).background(Color(0xFFF4F6FB)),
+            ) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text("К вопросам", style = MaterialTheme.typography.labelMedium)
             }
         }
 

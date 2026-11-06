@@ -39,6 +39,11 @@ data class ConspectState(
     val attempts: Int,
 )
 
+data class AssignedSubject(
+    val subjectId: String,
+    val subject: String,
+)
+
 data class SubjectSummary(
     val id: String,
     val name: String,
@@ -896,7 +901,7 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun assignSubject(sessionId: String, subjectId: String?, name: String?): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    suspend fun assignSubject(sessionId: String, subjectId: String?, name: String?): ApiResult<AssignedSubject> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val payload = JSONObject().put("sessionId", sessionId)
         if (!subjectId.isNullOrBlank()) payload.put("subjectId", subjectId)
@@ -907,8 +912,12 @@ class ApiClient(context: Context) {
             .build()
         val response = execute(request) ?: return@withContext networkFailure()
         response.use { response ->
-            if (response.isSuccessful) ApiResult.Ok(Unit)
-            else ApiResult.Failure(response.code, "", "Не удалось назначить предмет", false)
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful && json != null) {
+                ApiResult.Ok(AssignedSubject(json.optString("subjectId"), json.optString("subject")))
+            } else {
+                ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось назначить предмет" }, false)
+            }
         }
     }
 

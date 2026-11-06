@@ -362,8 +362,7 @@ private fun SubjectAssignDialog(
         scope.launch {
             when (val result = api.assignSubject(item.sessionId, subjectId, name)) {
                 is ApiResult.Ok -> {
-                    val resolvedName = name ?: subjects.firstOrNull { it.id == subjectId }?.name.orEmpty()
-                    onAssigned(subjectId.orEmpty(), resolvedName)
+                    onAssigned(result.value.subjectId, result.value.subject)
                 }
                 is ApiResult.Failure -> error = result.message
             }
