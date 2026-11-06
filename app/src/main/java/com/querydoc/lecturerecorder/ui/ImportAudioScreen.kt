@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.media.AudioImportExtractor
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
 
@@ -109,15 +110,30 @@ fun ImportAudioScreen(api: ApiClient, onBack: () -> Unit, onOpenConspects: () ->
                 }
                 prepared.file.delete()
                 status = "Запускаем конспект…"
-                val conspect = api.finalizeConspect(sessionId)
-                status = if (conspect is ApiResult.Ok) {
-                    imported = true
-                    "Аудио загружено. Конспект появится в библиотеке."
-                } else {
-                    "Аудио загружено. Конспект обрабатывается."
+                var attempts = 0
+                var finalStatus = ""
+                var finalError = ""
+                while (attempts < 20) {
+                    val conspect = api.finalizeConspect(sessionId)
+                    if (conspect is ApiResult.Failure) {
+                        finalError = conspect.message
+                        if (conspect.status != 202 && conspect.status > 0) break
+                    } else if (conspect is ApiResult.Ok) {
+                        finalStatus = conspect.value.status
+                        if (finalStatus == "completed" || finalStatus == "failed") break
+                    }
+                    attempts += 1
+                    status = "Конспект обрабатывается… ${attempts * 3} сек."
+                    delay(3000)
                 }
-                if (conspect is ApiResult.Failure) {
-                    error = conspect.message
+                if (finalStatus == "completed") {
+                    imported = true
+                    status = "Аудио загружено. Конспект готов."
+                } else if (finalStatus == "failed") {
+                    error = finalError.ifBlank { "Не удалось подготовить конспект" }
+                } else {
+                    imported = true
+                    status = "Аудио загружено. Конспект появится в библиотеке позже."
                 }
             } catch (exception: Exception) {
                 error = exception.message ?: "Не удалось импортировать файл"

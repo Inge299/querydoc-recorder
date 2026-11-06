@@ -279,7 +279,7 @@ class MainActivity : ComponentActivity() {
                             "import" -> ImportAudioScreen(
                                 api = api,
                                 onBack = { showImport = false },
-                                onOpenConspects = { showImport = false; showConspects = true },
+                                onOpenConspects = { showImport = false; showSettings = false; showConspects = true },
                             )
                             "support" -> SupportScreen(
                                 api = api,
