@@ -39,6 +39,18 @@ data class ConspectState(
     val attempts: Int,
 )
 
+data class SupportMessageItem(
+    val id: String,
+    val role: String,
+    val text: String,
+    val createdAt: String?,
+)
+
+data class SupportPayload(
+    val threadId: String,
+    val messages: List<SupportMessageItem>,
+)
+
 data class AssignedSubject(
     val subjectId: String,
     val subject: String,
@@ -898,6 +910,44 @@ class ApiClient(context: Context) {
         response.use { response ->
             if (response.isSuccessful) ApiResult.Ok(Unit)
             else ApiResult.Failure(response.code, "", "Не удалось удалить предмет", false)
+        }
+    }
+
+    suspend fun supportMessages(): ApiResult<SupportPayload> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/support").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось загрузить поддержку" }, response.code >= 500)
+            }
+            val thread = json.optJSONObject("thread")
+            val array = json.optJSONArray("messages") ?: JSONArray()
+            val messages = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                SupportMessageItem(
+                    id = item.optString("id"),
+                    role = item.optString("role"),
+                    text = item.optString("text"),
+                    createdAt = item.optString("createdAt").takeIf { it.isNotBlank() },
+                )
+            }
+            ApiResult.Ok(SupportPayload(thread?.optString("id").orEmpty(), messages))
+        }
+    }
+
+    suspend fun sendSupportMessage(text: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/support")
+            .post(JSONObject().put("text", text).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось отправить сообщение" }, response.code >= 500)
         }
     }
 

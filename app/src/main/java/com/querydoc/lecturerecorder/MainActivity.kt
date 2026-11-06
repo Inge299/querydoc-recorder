@@ -34,6 +34,7 @@ import com.querydoc.lecturerecorder.ui.LegalScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
 import com.querydoc.lecturerecorder.ui.NotificationsScreen
 import com.querydoc.lecturerecorder.ui.OnboardingScreen
+import com.querydoc.lecturerecorder.ui.SupportScreen
 import com.querydoc.lecturerecorder.ui.PlansScreen
 import com.querydoc.lecturerecorder.ui.RecoveryScreen
 import com.querydoc.lecturerecorder.ui.RegisterScreen
@@ -82,6 +83,7 @@ class MainActivity : ComponentActivity() {
             var showSettings by rememberSaveable { mutableStateOf(false) }
             var showPlans by rememberSaveable { mutableStateOf(false) }
             var showNotifications by rememberSaveable { mutableStateOf(false) }
+            var showSupport by rememberSaveable { mutableStateOf(false) }
             var unreadNotifications by remember { mutableStateOf(0) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
@@ -134,6 +136,7 @@ class MainActivity : ComponentActivity() {
                 showLegal -> "legal"
                 readerSession != null -> "reader"
                 showPlans -> "plans"
+                showSupport -> "support"
                 showNotifications -> "notifications"
                 showSettings -> "settings"
                 showConspects -> "conspects"
@@ -160,6 +163,9 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showNotifications) {
                 showNotifications = false
+            }
+            BackHandler(enabled = showSupport) {
+                showSupport = false
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
@@ -245,6 +251,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenLegal = { showLegal = true },
                                 onOpenPlans = { showPlans = true },
                                 onOpenNotifications = { showNotifications = true },
+                                onOpenSupport = { showSupport = true },
                                 onDeleteAccount = { password, callback ->
                                     scope.launch {
                                         when (val result = api.deleteAccount(password)) {
@@ -262,11 +269,16 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onBack = { showSettings = false },
                             )
+                            "support" -> SupportScreen(
+                                api = api,
+                                onBack = { showSupport = false },
+                            )
                             "notifications" -> NotificationsScreen(
                                 api = api,
                                 onBack = { showNotifications = false },
                                 onOpenPlans = { showNotifications = false; showPlans = true },
                                 onUnreadChanged = { unreadNotifications = it },
+                                onOpenSupport = { showNotifications = false; showSupport = true },
                             )
                             "plans" -> PlansScreen(
                                 api = api,

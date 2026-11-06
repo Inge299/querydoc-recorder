@@ -45,7 +45,7 @@ import com.querydoc.lecturerecorder.diagnostics.Analytics
 import kotlinx.coroutines.launch
 
 @Composable
-fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> Unit, onUnreadChanged: (Int) -> Unit) {
+fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> Unit, onUnreadChanged: (Int) -> Unit, onOpenSupport: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
@@ -138,6 +138,7 @@ fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> U
                 NotificationCard(
                     item = item,
                     onOpenPlans = onOpenPlans,
+                    onOpenSupport = onOpenSupport,
                     onOpenUrl = { url ->
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
                             .onFailure { Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show() }
@@ -149,7 +150,7 @@ fun NotificationsScreen(api: ApiClient, onBack: () -> Unit, onOpenPlans: () -> U
 }
 
 @Composable
-private fun NotificationCard(item: InboxNotification, onOpenPlans: () -> Unit, onOpenUrl: (String) -> Unit) {
+private fun NotificationCard(item: InboxNotification, onOpenPlans: () -> Unit, onOpenSupport: () -> Unit, onOpenUrl: (String) -> Unit) {
     val isPayment = item.kind == "payment"
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -169,6 +170,8 @@ private fun NotificationCard(item: InboxNotification, onOpenPlans: () -> Unit, o
             Text(item.body, style = MaterialTheme.typography.bodyMedium, color = Color(0xFF334155))
             if (isPayment) {
                 TextButton(onClick = onOpenPlans) { Text("Открыть тарифы") }
+            } else if (item.action == "support" || item.title == "Ответ поддержки") {
+                TextButton(onClick = onOpenSupport) { Text("Открыть поддержку") }
             } else if (item.actionUrl.isNotBlank()) {
                 TextButton(onClick = { onOpenUrl(item.actionUrl) }) { Text("Подробнее") }
             }

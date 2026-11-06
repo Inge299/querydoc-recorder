@@ -76,6 +76,7 @@ fun SettingsScreen(
     onOpenLegal: () -> Unit,
     onOpenPlans: () -> Unit,
     onOpenNotifications: () -> Unit,
+    onOpenSupport: () -> Unit,
     onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -133,6 +134,14 @@ fun SettingsScreen(
                     title = "Уведомления",
                     subtitle = "Платежи и обновления",
                     onClick = onOpenNotifications,
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.Phone,
+                    title = "Поддержка",
+                    subtitle = "Вопросы и проблемы",
+                    onClick = onOpenSupport,
+                    trailing = { Chevron() },
                 )
             }
 
