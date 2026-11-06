@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
@@ -33,7 +34,6 @@ import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.diagnostics.CrashReporter
 import com.querydoc.lecturerecorder.ui.ConspectReaderScreen
 import com.querydoc.lecturerecorder.ui.ConspectsScreen
-import com.querydoc.lecturerecorder.ui.ImportAudioScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LegalScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
@@ -104,10 +104,20 @@ class MainActivity : ComponentActivity() {
             var showPlans by rememberSaveable { mutableStateOf(false) }
             var showNotifications by rememberSaveable { mutableStateOf(false) }
             var showSupport by rememberSaveable { mutableStateOf(false) }
-            var showImport by rememberSaveable { mutableStateOf(false) }
             var unreadNotifications by remember { mutableStateOf(0) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
+            val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+                if (uri != null) {
+                    viewModel.startImport(uri)
+                    showSettings = false
+                    showPlans = false
+                    showConspects = false
+                    showNotifications = false
+                    showSupport = false
+                    readerSession = null
+                }
+            }
             LaunchedEffect(Unit) {
                 delay(1600)
                 introVisible = false
@@ -157,7 +167,6 @@ class MainActivity : ComponentActivity() {
                 showLegal -> "legal"
                 readerSession != null -> "reader"
                 showPlans -> "plans"
-                showImport -> "import"
                 showSupport -> "support"
                 showNotifications -> "notifications"
                 showSettings -> "settings"
@@ -188,9 +197,6 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showSupport) {
                 showSupport = false
-            }
-            BackHandler(enabled = showImport) {
-                showImport = false
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
@@ -257,7 +263,8 @@ class MainActivity : ComponentActivity() {
                             onDismissConspect = viewModel::dismissConspect,
                             onOpenConspects = { showConspects = true },
                             onOpenSettings = { showSettings = true },
-                            onOpenImport = { showImport = true },
+                            onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*")) },
+                            onDismissImport = viewModel::clearImportState,
                             unreadNotifications = unreadNotifications,
                             onOpenNotifications = { showNotifications = true }
                         )
@@ -278,7 +285,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenPlans = { showPlans = true },
                                 onOpenNotifications = { showNotifications = true },
                                 onOpenSupport = { showSupport = true },
-                                onOpenImport = { showImport = true },
+                                onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*")) },
                                 onDeleteAccount = { password, callback ->
                                     scope.launch {
                                         when (val result = api.deleteAccount(password)) {
@@ -295,11 +302,6 @@ class MainActivity : ComponentActivity() {
                                     scope.launch { api.logout(); loggedIn = false }
                                 },
                                 onBack = { showSettings = false },
-                            )
-                            "import" -> ImportAudioScreen(
-                                api = api,
-                                onBack = { showImport = false },
-                                onOpenConspects = { showImport = false; showSettings = false; showConspects = true },
                             )
                             "support" -> SupportScreen(
                                 api = api,

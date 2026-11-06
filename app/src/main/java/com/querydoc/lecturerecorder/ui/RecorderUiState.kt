@@ -38,5 +38,21 @@ data class RecorderUiState(
     val audioDownloadTotal: Int = 0,
     val audioDownloadActive: Boolean = false,
     val recordings: List<RecordingListItem> = emptyList(),
-    val conspectDialog: ConspectState? = null
+    val conspectDialog: ConspectState? = null,
+    val importState: ImportUiState? = null
+)
+
+enum class ImportStage {
+    PREPARING,
+    UPLOADING,
+    PROCESSING,
+    READY,
+    ERROR,
+}
+
+data class ImportUiState(
+    val stage: ImportStage,
+    val fileName: String = "",
+    val message: String = "",
+    val sessionId: String? = null,
 )

@@ -120,6 +120,7 @@ fun RecorderScreen(
     onOpenConspects: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImport: () -> Unit,
+    onDismissImport: () -> Unit,
     unreadNotifications: Int,
     onOpenNotifications: () -> Unit
 ) {
@@ -370,6 +371,14 @@ fun RecorderScreen(
         ) {
             Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
             Text("Импорт лекции из файла", modifier = Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
+        }
+
+        uiState.importState?.let { importState ->
+            ImportProgressCard(
+                state = importState,
+                onOpenConspects = onOpenConspects,
+                onDismiss = onDismissImport,
+            )
         }
 
         Card(
@@ -1005,4 +1014,51 @@ private fun formatDurationMs(ms: Long): String {
     val m = totalSeconds / 60
     val s = totalSeconds % 60
     return "%02d:%02d".format(m, s)
+}
+
+
+@Composable
+private fun ImportProgressCard(
+    state: ImportUiState,
+    onOpenConspects: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = when (state.stage) {
+                ImportStage.ERROR -> Color(0xFFFEF2F2)
+                ImportStage.READY -> Color(0xFFECFDF5)
+                else -> Color(0xFFEEF2FF)
+            },
+        ),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Text("Импорт лекции", style = MaterialTheme.typography.labelMedium, color = Color(0xFF475569))
+            if (state.fileName.isNotBlank()) {
+                Text(state.fileName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A), maxLines = 1)
+            }
+            Text(
+                state.message.ifBlank { "Обрабатываем файл…" },
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state.stage == ImportStage.ERROR) Color(0xFFB91C1C) else Color(0xFF4338CA),
+            )
+            if (state.stage == ImportStage.PREPARING || state.stage == ImportStage.UPLOADING || state.stage == ImportStage.PROCESSING) {
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth().height(4.dp),
+                    color = Color(0xFF4338CA),
+                    trackColor = Color(0xFFE2E8F0),
+                )
+            }
+            when (state.stage) {
+                ImportStage.READY -> TextButton(onClick = onOpenConspects) { Text("Открыть конспекты") }
+                ImportStage.ERROR, ImportStage.PROCESSING -> TextButton(onClick = onDismiss) { Text("Закрыть") }
+                else -> Unit
+            }
+        }
+    }
 }

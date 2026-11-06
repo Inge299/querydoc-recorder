@@ -3,6 +3,7 @@ package com.querydoc.lecturerecorder.ui
 import android.Manifest
 import android.app.Application
 import android.content.Intent
+import android.net.Uri
 import android.media.MediaMetadataRetriever
 import android.media.MediaPlayer
 import android.os.Build
@@ -19,6 +20,7 @@ import com.querydoc.lecturerecorder.data.local.StudyProgressStore
 import com.querydoc.lecturerecorder.data.local.PlaybackPositionStore
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
+import com.querydoc.lecturerecorder.media.AudioImportExtractor
 import com.querydoc.lecturerecorder.recording.AudioRecordingService
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 import com.querydoc.lecturerecorder.recording.IdleMicLevelMonitor
@@ -230,6 +232,100 @@ class RecorderViewModel(
 
     fun onAuthorizationRequested() {
         _state.update { it.copy(statusText = "Авторизация будет добавлена позже") }
+    }
+
+    fun startImport(uri: Uri) {
+        val current = state.value.importState
+        if (current?.stage == ImportStage.PREPARING || current?.stage == ImportStage.UPLOADING || current?.stage == ImportStage.PROCESSING) return
+        _state.update { it.copy(importState = ImportUiState(ImportStage.PREPARING, message = "Готовим аудио…")) }
+        viewModelScope.launch {
+            var preparedFile: File? = null
+            try {
+                val prepared = AudioImportExtractor.prepare(app, uri).getOrElse { throw it }
+                preparedFile = prepared.file
+                if (prepared.durationMs > 120 * 60 * 1000L) {
+                    throw IllegalStateException("Лекция длиннее 120 минут")
+                }
+                _state.update {
+                    it.copy(importState = ImportUiState(ImportStage.UPLOADING, prepared.fileName, "Загружаем в облако…"))
+                }
+                val sessionId = java.util.UUID.randomUUID().toString()
+                val chunkId = java.util.UUID.randomUUID().toString()
+                val upload = when (val result = api.presign(
+                    chunkId = chunkId,
+                    sessionId = sessionId,
+                    chunkIndex = 0,
+                    chunkCount = 1,
+                    sizeBytes = prepared.file.length(),
+                    mimeType = prepared.mimeType,
+                    fileName = prepared.fileName,
+                    durationMs = prepared.durationMs,
+                    capturedAtMs = System.currentTimeMillis(),
+                    language = "ru-RU",
+                )) {
+                    is ApiResult.Ok -> result.value
+                    is ApiResult.Failure -> throw IllegalStateException(result.message)
+                }
+                if (!upload.duplicate) {
+                    when (val put = api.putObject(upload, prepared.file)) {
+                        is ApiResult.Ok -> Unit
+                        is ApiResult.Failure -> throw IllegalStateException(put.message)
+                    }
+                    when (val complete = api.complete(upload.uploadSessionId, chunkId)) {
+                        is ApiResult.Ok -> Unit
+                        is ApiResult.Failure -> throw IllegalStateException(complete.message)
+                    }
+                }
+                prepared.file.delete()
+                preparedFile = null
+                _state.update {
+                    it.copy(importState = ImportUiState(ImportStage.PROCESSING, prepared.fileName, "Распознаём и готовим конспект…", sessionId))
+                }
+                var attempts = 0
+                var finalStatus = ""
+                var finalError = ""
+                var lastFailure: ApiResult.Failure? = null
+                while (attempts < 20) {
+                    val conspect = api.finalizeConspect(sessionId)
+                    if (conspect is ApiResult.Failure) {
+                        lastFailure = conspect
+                        finalError = conspect.message
+                        if (conspect.status != 202 && conspect.status > 0) break
+                    } else if (conspect is ApiResult.Ok) {
+                        finalStatus = conspect.value.status
+                        if (finalStatus == "completed" || finalStatus == "failed") break
+                    }
+                    attempts += 1
+                    delay(3000)
+                }
+                when {
+                    finalStatus == "completed" -> {
+                        _state.update { it.copy(importState = ImportUiState(ImportStage.READY, prepared.fileName, "Конспект готов", sessionId)) }
+                        refreshUsage()
+                    }
+                    finalStatus == "failed" -> {
+                        _state.update { it.copy(importState = ImportUiState(ImportStage.ERROR, prepared.fileName, finalError.ifBlank { "Не удалось подготовить конспект" })) }
+                    }
+                    lastFailure?.status == 422 -> {
+                        api.deleteAudioSession(sessionId)
+                        _state.update { it.copy(importState = ImportUiState(ImportStage.ERROR, prepared.fileName, "Слишком короткая запись — удалена")) }
+                    }
+                    else -> {
+                        _state.update { it.copy(importState = ImportUiState(ImportStage.PROCESSING, prepared.fileName, "Конспект обрабатывается в фоне", sessionId)) }
+                    }
+                }
+            } catch (exception: Exception) {
+                _state.update {
+                    it.copy(importState = ImportUiState(ImportStage.ERROR, preparedFile?.name.orEmpty(), exception.message ?: "Не удалось импортировать файл"))
+                }
+            } finally {
+                preparedFile?.delete()
+            }
+        }
+    }
+
+    fun clearImportState() {
+        _state.update { it.copy(importState = null) }
     }
 
     fun requestConspect(sessionId: String) {
