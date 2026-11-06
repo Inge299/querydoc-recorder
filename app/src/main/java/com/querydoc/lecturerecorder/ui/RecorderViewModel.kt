@@ -81,6 +81,8 @@ class RecorderViewModel(
     private var elapsedJob: Job? = null
     private var storageJob: Job? = null
     private var recordingStartedAtMs = 0L
+    @Volatile
+    private var appForeground = true
     private var pausedAtMs = 0L
     private var pausedDurationMs = 0L
 
@@ -95,7 +97,7 @@ class RecorderViewModel(
     init {
         idleMicMonitor.setFarLecturerMode(initialFarLecturerMode)
         idleMicMonitor.setEnvironmentProfile(initialEnvironmentProfile)
-        idleMicMonitor.start()
+        startIdleMicIfAllowed()
         observeQueue()
         observePendingUploads()
         observeTelemetry()
@@ -114,7 +116,7 @@ class RecorderViewModel(
         if (!hasMic) {
             idleMicMonitor.stop()
         } else if (!state.value.isRecording) {
-            idleMicMonitor.start()
+            startIdleMicIfAllowed()
         }
     }
 
@@ -171,7 +173,7 @@ class RecorderViewModel(
             app.startService(Intent(app, AudioRecordingService::class.java).apply {
                 action = AudioRecordingService.ACTION_PAUSE
             })
-            idleMicMonitor.start()
+            idleMicMonitor.stop()
             _state.update { it.copy(isRecordingPaused = true, statusText = "Пауза записи") }
         }
     }
@@ -187,8 +189,6 @@ class RecorderViewModel(
         }
         elapsedJob?.cancel()
         elapsedJob = null
-        idleMicMonitor.start()
-        refreshUsage()
         _state.update {
             it.copy(
                 isRecording = false,
@@ -196,6 +196,8 @@ class RecorderViewModel(
                 statusText = "Запись остановлена"
             )
         }
+        startIdleMicIfAllowed()
+        refreshUsage()
     }
 
     fun toggleFarLecturerMode() {
@@ -563,6 +565,22 @@ class RecorderViewModel(
                 _state.update { it.copy(elapsedSeconds = elapsedMs / 1000L) }
                 delay(250L)
             }
+        }
+    }
+
+    fun onAppForeground() {
+        appForeground = true
+        if (!state.value.isRecording || state.value.isRecordingPaused) startIdleMicIfAllowed()
+    }
+
+    fun onAppBackground() {
+        appForeground = false
+        if (!state.value.isRecording || state.value.isRecordingPaused) idleMicMonitor.stop()
+    }
+
+    private fun startIdleMicIfAllowed() {
+        if (appForeground && state.value.hasMicPermission && !state.value.isRecording) {
+            idleMicMonitor.start()
         }
     }
 
