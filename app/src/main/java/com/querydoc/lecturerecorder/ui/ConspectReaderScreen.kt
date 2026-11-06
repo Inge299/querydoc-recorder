@@ -415,6 +415,7 @@ private fun LectureQaContent(
     var input by remember(sessionId) { mutableStateOf("") }
     var loading by remember(sessionId) { mutableStateOf(false) }
     var error by remember(sessionId) { mutableStateOf("") }
+    var showQuestions by remember(sessionId) { mutableStateOf(messages.isEmpty()) }
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
@@ -423,6 +424,7 @@ private fun LectureQaContent(
         if (trimmed.isBlank() || loading) return
         Analytics.track(context, "qa_asked")
         val history = messages.map { QaHistoryTurn(it.role, it.text) }
+        showQuestions = false
         onMessagesChange(messages + QaMessage("user", trimmed))
         input = ""
         error = ""
@@ -447,10 +449,22 @@ private fun LectureQaContent(
     }
 
     Box(modifier = modifier.fillMaxSize().imePadding()) {
+        if (messages.isNotEmpty()) {
+            TextButton(
+                onClick = {
+                    showQuestions = true
+                    scope.launch { listState.animateScrollToItem(0) }
+                },
+                modifier = Modifier.align(Alignment.TopStart).padding(start = 4.dp, top = 2.dp).background(Color(0xFFF4F6FB)),
+            ) {
+                Icon(Icons.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(16.dp))
+                Text("К вопросам", style = MaterialTheme.typography.labelMedium)
+            }
+        }
         LazyColumn(
             state = listState,
             modifier = Modifier.fillMaxSize().padding(bottom = 76.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+            contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 16.dp, top = if (messages.isNotEmpty()) 44.dp else 8.dp, end = 16.dp, bottom = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             if (messages.isEmpty()) {
@@ -471,8 +485,16 @@ private fun LectureQaContent(
                         }
                     }
                 }
+            }
+            if (messages.isEmpty() || showQuestions) {
                 item(key = "qa_suggestions") {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "Быстрые вопросы",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(horizontal = 4.dp),
+                        )
                         listOf(
                             "О чём эта лекция?",
                             "Объясни главную мысль",

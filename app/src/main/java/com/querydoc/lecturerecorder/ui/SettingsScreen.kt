@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material3.Card
@@ -79,6 +80,9 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     var logoutConfirm by remember { mutableStateOf(false) }
+    var showMicModeDialog by remember { mutableStateOf(false) }
+    var showAcousticDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
     var deleteDialog by remember { mutableStateOf(false) }
@@ -132,32 +136,25 @@ fun SettingsScreen(
                 )
             }
 
-            SettingsSection(title = "ЗАПИСЬ") {
+            SettingsSection(title = "МИКРОФОН") {
                 SettingRow(
                     icon = Icons.Filled.Mic,
-                    title = "Режим записи",
+                    title = "Режим",
                     subtitle = if (farLecturerMode) "Дальний лектор" else "Обычный микрофон",
-                    onClick = onToggleFarLecturerMode,
-                    trailing = { CheckMark() },
+                    onClick = { showMicModeDialog = true },
+                    trailing = { Chevron() },
                 )
                 SettingDivider()
-                SettingsLabelRow(
+                SettingRow(
                     icon = Icons.Filled.SettingsVoice,
-                    title = "Профиль микрофона",
+                    title = "Акустика",
                     subtitle = environmentProfile.labelRu(),
+                    onClick = { showAcousticDialog = true },
+                    trailing = { Chevron() },
                 )
-                Column {
-                    EnvironmentProfile.entries.forEach { profile ->
-                        RadioRow(
-                            title = profile.labelRu(),
-                            selected = environmentProfile == profile,
-                            onClick = { onSetEnvironmentProfile(profile) },
-                        )
-                    }
-                }
                 SettingDivider()
                 ToggleRow(
-                    icon = Icons.Filled.Notifications,
+                    icon = Icons.Filled.Phone,
                     title = "Автопауза",
                     subtitle = "При входящем звонке запись ставится на паузу",
                     checked = pauseOnInterruptions,
@@ -175,19 +172,14 @@ fun SettingsScreen(
                 )
             }
 
-            SettingsSection(title = "ЯЗЫК РАСПОЗНАВАНИЯ") {
-                RecognitionLanguage.entries.forEach { language ->
-                    RadioRow(
-                        title = language.label,
-                        subtitle = when (language) {
-                            RecognitionLanguage.RU -> "Для русских лекций"
-                            RecognitionLanguage.RU_EN -> "Для лекций с английскими терминами"
-                            RecognitionLanguage.EN -> "Для английских лекций"
-                        },
-                        selected = recognitionLanguage == language,
-                        onClick = { onSetRecognitionLanguage(language) },
-                    )
-                }
+            SettingsSection(title = "РАСПОЗНАВАНИЕ") {
+                SettingRow(
+                    icon = Icons.Filled.Language,
+                    title = "Язык лекции",
+                    subtitle = recognitionLanguage.label,
+                    onClick = { showLanguageDialog = true },
+                    trailing = { Chevron() },
+                )
             }
 
             SettingsSection(title = "ЛИМИТЫ") {
@@ -269,6 +261,45 @@ fun SettingsScreen(
             }
             Spacer(Modifier.height(12.dp))
         }
+    }
+
+    if (showMicModeDialog) {
+        ChoiceDialog(
+            title = "Режим микрофона",
+            options = listOf("Обычный микрофон", "Дальний лектор"),
+            selectedIndex = if (farLecturerMode) 1 else 0,
+            onSelect = { index ->
+                showMicModeDialog = false
+                if ((index == 1) != farLecturerMode) onToggleFarLecturerMode()
+            },
+            onDismiss = { showMicModeDialog = false },
+        )
+    }
+
+    if (showAcousticDialog) {
+        ChoiceDialog(
+            title = "Акустика",
+            options = EnvironmentProfile.entries.map { it.labelRu() },
+            selectedIndex = EnvironmentProfile.entries.indexOf(environmentProfile),
+            onSelect = { index ->
+                showAcousticDialog = false
+                onSetEnvironmentProfile(EnvironmentProfile.entries[index])
+            },
+            onDismiss = { showAcousticDialog = false },
+        )
+    }
+
+    if (showLanguageDialog) {
+        ChoiceDialog(
+            title = "Язык распознавания",
+            options = RecognitionLanguage.entries.map { it.label },
+            selectedIndex = RecognitionLanguage.entries.indexOf(recognitionLanguage),
+            onSelect = { index ->
+                showLanguageDialog = false
+                onSetRecognitionLanguage(RecognitionLanguage.entries[index])
+            },
+            onDismiss = { showLanguageDialog = false },
+        )
     }
 
     if (logoutConfirm) {
@@ -380,6 +411,34 @@ private fun SettingsSection(title: String, content: @Composable () -> Unit) {
             Column { content() }
         }
     }
+}
+
+@Composable
+private fun ChoiceDialog(
+    title: String,
+    options: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column {
+                options.forEachIndexed { index, label ->
+                    RadioRow(
+                        title = label,
+                        selected = index == selectedIndex,
+                        onClick = { onSelect(index) },
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Закрыть") }
+        },
+    )
 }
 
 @Composable
