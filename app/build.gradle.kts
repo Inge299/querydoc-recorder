@@ -57,9 +57,10 @@ android {
     }
 
     buildTypes {
+        val devBuild = project.hasProperty("devBuild")
         getByName("debug") {
-            applicationIdSuffix = ".beta"
-            versionNameSuffix = "-beta.1"
+            applicationIdSuffix = if (devBuild) ".dev" else ".beta"
+            versionNameSuffix = if (devBuild) "-dev" else "-beta.1"
         }
         release {
             // Никогда не подписываем release debug-ключом. Без keystore

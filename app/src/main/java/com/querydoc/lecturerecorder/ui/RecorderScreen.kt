@@ -52,6 +52,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.AlertDialog
@@ -118,6 +119,7 @@ fun RecorderScreen(
     onDismissConspect: () -> Unit,
     onOpenConspects: () -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenImport: () -> Unit,
     unreadNotifications: Int,
     onOpenNotifications: () -> Unit
 ) {
@@ -360,6 +362,14 @@ fun RecorderScreen(
                     onClick = onStopRecording,
                 )
             }
+        }
+
+        TextButton(
+            onClick = onOpenImport,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
+            Text("Импорт лекции из файла", modifier = Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
         }
 
         Card(

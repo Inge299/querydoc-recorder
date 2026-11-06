@@ -238,6 +238,7 @@ class MainActivity : ComponentActivity() {
                             onDismissConspect = viewModel::dismissConspect,
                             onOpenConspects = { showConspects = true },
                             onOpenSettings = { showSettings = true },
+                            onOpenImport = { showImport = true },
                             unreadNotifications = unreadNotifications,
                             onOpenNotifications = { showNotifications = true }
                         )
