@@ -113,9 +113,11 @@ fun ImportAudioScreen(api: ApiClient, onBack: () -> Unit, onOpenConspects: () ->
                 var attempts = 0
                 var finalStatus = ""
                 var finalError = ""
+                var lastFailure: ApiResult.Failure? = null
                 while (attempts < 20) {
                     val conspect = api.finalizeConspect(sessionId)
                     if (conspect is ApiResult.Failure) {
+                        lastFailure = conspect
                         finalError = conspect.message
                         if (conspect.status != 202 && conspect.status > 0) break
                     } else if (conspect is ApiResult.Ok) {
@@ -126,14 +128,24 @@ fun ImportAudioScreen(api: ApiClient, onBack: () -> Unit, onOpenConspects: () ->
                     status = "Конспект обрабатывается… ${attempts * 3} сек."
                     delay(3000)
                 }
-                if (finalStatus == "completed") {
-                    imported = true
-                    status = "Аудио загружено. Конспект готов."
-                } else if (finalStatus == "failed") {
-                    error = finalError.ifBlank { "Не удалось подготовить конспект" }
-                } else {
-                    imported = true
-                    status = "Аудио загружено. Конспект появится в библиотеке позже."
+                when {
+                    finalStatus == "completed" -> {
+                        imported = true
+                        status = "Аудио загружено. Конспект готов."
+                    }
+                    finalStatus == "failed" -> error = finalError.ifBlank { "Не удалось подготовить конспект" }
+                    lastFailure?.status == 422 -> {
+                        val failure = lastFailure
+                        api.deleteAudioSession(sessionId)
+                        imported = false
+                        status = ""
+                        error = failure?.message?.ifBlank { "Запись слишком короткая — удалена" }
+                            ?: "Запись слишком короткая — удалена"
+                    }
+                    else -> {
+                        imported = true
+                        status = "Аудио загружено. Конспект обрабатывается в фоне."
+                    }
                 }
             } catch (exception: Exception) {
                 error = exception.message ?: "Не удалось импортировать файл"

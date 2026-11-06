@@ -248,15 +248,28 @@ class RecorderViewModel(
                     is ApiResult.Failure -> {
                         if (cached != null && result.status == 0) {
                             _state.update { it.copy(statusText = "Нет сети — показан сохранённый конспект") }
-                        } else {
-                            val quotaError = result.code == "recording_quota_exceeded" || result.code == "session_too_long"
+                            refreshUsage()
+                            return@launch
+                        }
+                        if (result.status == 422) {
+                            viewModelScope.launch(Dispatchers.IO) { api.deleteAudioSession(sessionId) }
+                            deleteLocalPackage(sessionId)
                             _state.update {
                                 it.copy(
-                                    statusText = if (quotaError) "Закончился лимит записи" else "Не удалось открыть конспект",
-                                    paywallRequested = quotaError,
-                                    conspectDialog = if (quotaError) null else ConspectState(sessionId, "failed", "", result.message, 0),
+                                    statusText = "Слишком короткая запись — удалена",
+                                    conspectDialog = null,
                                 )
                             }
+                            refreshUsage()
+                            return@launch
+                        }
+                        val quotaError = result.code == "recording_quota_exceeded" || result.code == "session_too_long"
+                        _state.update {
+                            it.copy(
+                                statusText = if (quotaError) "Закончился лимит записи" else "Не удалось открыть конспект",
+                                paywallRequested = quotaError,
+                                conspectDialog = if (quotaError) null else ConspectState(sessionId, "failed", "", result.message, 0),
+                            )
                         }
                         refreshUsage()
                         return@launch
@@ -264,6 +277,7 @@ class RecorderViewModel(
                 }
                 refreshUsage()
                 var polls = 0
+                var tooShort = false
                 while (current != null && current.status != "completed" && current.status != "failed" && polls < 150) {
                     delay(4_000)
                     polls += 1
@@ -274,12 +288,24 @@ class RecorderViewModel(
                                 _state.update { it.copy(statusText = "Нет сети — показан сохранённый конспект") }
                                 return@launch
                             }
+                            if (result.status == 422) {
+                                tooShort = true
+                                current = ConspectState(sessionId, "failed", "", result.message, 0)
+                                break
+                            }
                             // The aggregate may still be waiting for STT/indexing; retry finalize.
                             if (result.status != 404 && result.status != 202) {
                                 current = ConspectState(sessionId, "failed", "", result.message, 0)
                             }
                         }
                     }
+                }
+                if (tooShort) {
+                    viewModelScope.launch(Dispatchers.IO) { api.deleteAudioSession(sessionId) }
+                    deleteLocalPackage(sessionId)
+                    _state.update { it.copy(statusText = "Слишком короткая запись — удалена", conspectDialog = null) }
+                    refreshUsage()
+                    return@launch
                 }
                 val finalState = current
                 if (finalState != null && finalState.status == "completed") {
