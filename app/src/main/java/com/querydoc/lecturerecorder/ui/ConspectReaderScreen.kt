@@ -64,6 +64,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -123,6 +124,14 @@ fun ConspectReaderScreen(
 
     LaunchedEffect(sessionId) {
         Analytics.track(context, "conspect_open")
+    }
+
+    DisposableEffect(sessionId) {
+        val startedAt = System.currentTimeMillis()
+        onDispose {
+            val seconds = ((System.currentTimeMillis() - startedAt) / 1000L).coerceAtLeast(0L)
+            Analytics.track(context, "conspect_read", mapOf("sessionId" to sessionId, "seconds" to seconds.toString()))
+        }
     }
 
     LaunchedEffect(reload) {
@@ -232,6 +241,7 @@ fun ConspectReaderScreen(
                 IconButton(onClick = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(if (tab == 0) "Конспект" else "Транскрипт", shareText))
+                    Analytics.track(context, "export_conspect", mapOf("sessionId" to sessionId, "format" to "clipboard"))
                     Toast.makeText(context, "Скопировано", Toast.LENGTH_SHORT).show()
                 }) {
                     Icon(Icons.Filled.ContentCopy, contentDescription = "Копировать", tint = Color(0xFF4338CA))
@@ -242,6 +252,7 @@ fun ConspectReaderScreen(
                         putExtra(Intent.EXTRA_SUBJECT, title)
                         putExtra(Intent.EXTRA_TEXT, shareText)
                     }
+                    Analytics.track(context, "export_conspect", mapOf("sessionId" to sessionId, "format" to "share"))
                     context.startActivity(Intent.createChooser(send, "Поделиться"))
                 }) {
                     Icon(Icons.Filled.Share, contentDescription = "Поделиться", tint = Color(0xFF4338CA))

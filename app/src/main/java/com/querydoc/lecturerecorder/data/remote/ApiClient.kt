@@ -131,6 +131,7 @@ data class PlanInfo(
     val maxSessionMinutes: Int,
     val dailyQa: Int,
     val dailyStudyKit: Int,
+    val monthlyDocuments: Int,
     val storageDays: Int,
 )
 
@@ -897,6 +898,7 @@ class ApiClient(context: Context) {
                     maxSessionMinutes = limits?.optInt("maxSessionMinutes") ?: 0,
                     dailyQa = limits?.optInt("dailyQa") ?: 0,
                     dailyStudyKit = limits?.optInt("dailyStudyKit") ?: 0,
+                    monthlyDocuments = limits?.optInt("monthlyDocuments") ?: 0,
                     storageDays = limits?.optInt("storageDays") ?: 0,
                 )
             }
