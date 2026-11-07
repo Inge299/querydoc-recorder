@@ -342,6 +342,7 @@ class MainActivity : ComponentActivity() {
                                 onPause = viewModel::pausePlaybackForItem,
                                 onStop = viewModel::stopPlaybackForItem,
                                 onSeek = viewModel::seekPlaybackPosition,
+                                onPrepareAudio = viewModel::ensureAudioSession,
                                 onBack = {
                                     readerSession = null
                                     readerMarkdown = null

@@ -440,6 +440,52 @@ class RecorderViewModel(
         _state.update { it.copy(paywallRequested = false) }
     }
 
+    private val audioPrepareJobs = mutableMapOf<String, Job>()
+
+    fun ensureAudioSession(sessionId: String) {
+        if (sessionId.isBlank() || recordingsById[sessionId] != null) return
+        if (audioPrepareJobs[sessionId]?.isActive == true) return
+        audioPrepareJobs[sessionId] = viewModelScope.launch {
+            _state.update { it.copy(playbackStatus = "Загружаем аудио из облака…") }
+            when (val result = api.audioSession(sessionId)) {
+                is ApiResult.Ok -> {
+                    if (result.value.chunks.isEmpty()) {
+                        _state.update { it.copy(playbackStatus = "Аудио больше недоступно: истёк срок хранения") }
+                        return@launch
+                    }
+                    val durations = result.value.chunks.map { it.durationMs.coerceAtLeast(1_000L) }
+                    val remote = RecordingListItem(
+                        id = sessionId,
+                        title = "Аудиозапись лекции",
+                        filePath = "",
+                        chunkPaths = result.value.chunks.map { it.url },
+                        chunkDurationsMs = durations,
+                        durationMs = durations.sum(),
+                        createdAtLabel = "",
+                        durationLabel = formatDuration(durations.sum()),
+                        status = UploadStatus.UPLOADED,
+                        stage = RecordingStage.CLOUD,
+                        uploadedChunks = result.value.chunks.size,
+                        totalChunks = result.value.chunks.size,
+                        conspectStatus = "completed",
+                        conspectCreatedAt = "",
+                        conspectEtaSeconds = 0L,
+                        statusLabel = "В облаке",
+                        deleteAfterLabel = "",
+                    )
+                    recordingsById = recordingsById + (sessionId to remote)
+                    _state.update {
+                        it.copy(
+                            recordings = if (it.recordings.any { row -> row.id == sessionId }) it.recordings else it.recordings + remote,
+                            playbackStatus = "Аудио готово",
+                        )
+                    }
+                }
+                is ApiResult.Failure -> _state.update { it.copy(playbackStatus = result.message) }
+            }
+        }
+    }
+
     fun playRecordingById(id: String, startFraction: Float?) {
         if (state.value.isRecording) return
         val item = recordingsById[id] ?: return

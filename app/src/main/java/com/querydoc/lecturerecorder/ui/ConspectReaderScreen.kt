@@ -102,6 +102,7 @@ fun ConspectReaderScreen(
     onPause: (String) -> Unit,
     onStop: (String) -> Unit,
     onSeek: (String, Float) -> Unit,
+    onPrepareAudio: (String) -> Unit,
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -357,6 +358,9 @@ fun ConspectReaderScreen(
                 }
             }
         } else if (tab == 2) {
+            LaunchedEffect(sessionId, tab) {
+                if (tab == 2) onPrepareAudio(sessionId)
+            }
             AudioTabContent(
                 sessionId = sessionId,
                 playerState = playerState,

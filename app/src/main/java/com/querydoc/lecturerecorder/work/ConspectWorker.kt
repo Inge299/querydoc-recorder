@@ -20,6 +20,8 @@ import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectState
 import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
+import com.querydoc.lecturerecorder.data.local.AudioCache
+import java.io.File
 import kotlinx.coroutines.delay
 
 class ConspectWorker(
@@ -61,6 +63,13 @@ class ConspectWorker(
                         Diagnostics.warn(applicationContext, "ConspectWorker: authorization required")
                         return Result.failure()
                     }
+                    if (result.status == 422) {
+                        runCatching { api.deleteAudioSession(sessionId) }
+                        cleanupShortSession(sessionId)
+                        notifyFailed(sessionId, "Слишком короткая запись — удалена")
+                        Diagnostics.warn(applicationContext, "ConspectWorker: too short $sessionId")
+                        return Result.success()
+                    }
                     if (result.status !in listOf(404, 202)) {
                         Diagnostics.warn(applicationContext, "ConspectWorker: poll failure ${result.status} ${result.message}")
                     }
@@ -73,6 +82,18 @@ class ConspectWorker(
         if (isStopped) return Result.retry()
         notifyFailed(sessionId, lastError.ifBlank { "Конспект готовится слишком долго" })
         return Result.success()
+    }
+
+    private suspend fun cleanupShortSession(sessionId: String) {
+        val dao = AppGraph.db(applicationContext).uploadQueueDao()
+        val items = dao.allAudioItems().filter { item ->
+            item.metadataJson?.contains("sessionId=$sessionId") == true
+        }
+        items.forEach { item ->
+            runCatching { File(item.filePath).delete() }
+            runCatching { dao.deleteById(item.id) }
+        }
+        AudioCache.clear(applicationContext, sessionId)
     }
 
     private fun notifyCompleted(sessionId: String, markdown: String) {
