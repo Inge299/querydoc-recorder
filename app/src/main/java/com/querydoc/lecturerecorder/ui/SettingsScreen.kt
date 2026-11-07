@@ -68,6 +68,8 @@ fun SettingsScreen(
     pauseOnInterruptions: Boolean,
     pauseAudioOnLeave: Boolean,
     recognitionLanguage: RecognitionLanguage,
+    maxRecordingMinutes: Int,
+    onSetMaxRecordingMinutes: (Int) -> Unit,
     onToggleFarLecturerMode: () -> Unit,
     onSetPauseOnInterruptions: (Boolean) -> Unit,
     onSetPauseAudioOnLeave: (Boolean) -> Unit,
@@ -86,6 +88,7 @@ fun SettingsScreen(
     var showMicModeDialog by remember { mutableStateOf(false) }
     var showAcousticDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showLimitDialog by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
     var deleteDialog by remember { mutableStateOf(false) }
@@ -153,6 +156,14 @@ fun SettingsScreen(
                     title = "Импорт лекции",
                     subtitle = "Аудио или видео → аудиодорожка",
                     onClick = onOpenImport,
+                    trailing = { Chevron() },
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.Info,
+                    title = "Максимальная длина записи",
+                    subtitle = "$maxRecordingMinutes мин",
+                    onClick = { showLimitDialog = true },
                     trailing = { Chevron() },
                 )
                 SettingDivider()
@@ -318,6 +329,20 @@ fun SettingsScreen(
                 onSetRecognitionLanguage(RecognitionLanguage.entries[index])
             },
             onDismiss = { showLanguageDialog = false },
+        )
+    }
+
+    if (showLimitDialog) {
+        val options = listOf(30, 60, 90, 120)
+        ChoiceDialog(
+            title = "Максимальная длина записи",
+            options = options.map { "$it минут" },
+            selectedIndex = options.indexOf(maxRecordingMinutes).coerceAtLeast(0),
+            onSelect = { index ->
+                showLimitDialog = false
+                onSetMaxRecordingMinutes(options[index])
+            },
+            onDismiss = { showLimitDialog = false },
         )
     }
 

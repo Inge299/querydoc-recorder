@@ -65,6 +65,7 @@ data class SubjectSummary(
 data class ConspectSummary(
     val sessionId: String,
     val title: String,
+    val sourceTitle: String = "",
     val subject: String = "",
     val subjectId: String = "",
     val preview: String,
@@ -995,6 +996,7 @@ class ApiClient(context: Context) {
                 ConspectSummary(
                     sessionId = item.optString("sessionId"),
                     title = item.optString("title").ifBlank { "Конспект лекции" },
+                    sourceTitle = item.optString("sourceTitle"),
                     subject = item.optString("subject"),
                     subjectId = item.optString("subjectId"),
                     preview = item.optString("preview"),

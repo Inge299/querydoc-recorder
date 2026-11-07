@@ -80,6 +80,10 @@ class AudioRecordingService : Service() {
             }
             ACTION_PAUSE -> pauseRecordingIfNeeded()
             ACTION_RESUME -> resumeRecordingIfNeeded()
+            ACTION_EXTEND -> {
+                RecordingLimitStore.extend(this)
+                NotificationHelper.cancelLimitWarning(this)
+            }
             ACTION_STOP -> stopRecording()
         }
         return START_STICKY
@@ -95,6 +99,7 @@ class AudioRecordingService : Service() {
         if (isRecording) return
         Diagnostics.info(applicationContext, "AudioRecordingService: start requested (AudioRecord + MediaCodec)")
         NotificationHelper.ensureChannel(this)
+        NotificationHelper.cancelLimitWarning(this)
         startForeground(
             NotificationHelper.recordingNotificationId,
             NotificationHelper.buildRecordingNotification(this, getString(R.string.notification_recording_text))
@@ -149,6 +154,7 @@ class AudioRecordingService : Service() {
         }
         isRecording = false
         isPaused = false
+        NotificationHelper.cancelLimitWarning(this)
         val active = recorder
         recorder = null
         val completedSessionId = sessionId
@@ -266,6 +272,7 @@ class AudioRecordingService : Service() {
         const val ACTION_PAUSE = "com.querydoc.lecturerecorder.PAUSE_RECORDING"
         const val ACTION_RESUME = "com.querydoc.lecturerecorder.RESUME_RECORDING"
         const val ACTION_STOP = "com.querydoc.lecturerecorder.STOP_RECORDING"
+        const val ACTION_EXTEND = "com.querydoc.lecturerecorder.EXTEND_RECORDING"
         const val EXTRA_FAR_LECTURER_MODE = "extra_far_lecturer_mode"
         const val EXTRA_ENVIRONMENT_PROFILE = "extra_environment_profile"
         const val EXTRA_PAUSE_ON_INTERRUPTION = "extra_pause_on_interruption"

@@ -14,6 +14,7 @@ data class RecorderUiState(
     val recognitionLanguage: RecognitionLanguage = RecognitionLanguage.RU,
     val energySaverEnabled: Boolean = true,
     val elapsedSeconds: Long = 0L,
+    val maxRecordingMinutes: Int = 90,
     val remainingRecordSeconds: Long = 0L,
     val recordingUsedMinutes: Int = 0,
     val recordingLimitMinutes: Int = 180,

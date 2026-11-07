@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.AlertDialog
@@ -99,6 +100,8 @@ fun ConspectsScreen(
     var expandedSubjects by remember { mutableStateOf<Set<String>>(emptySet()) }
     var deleting by remember { mutableStateOf(false) }
     var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
+    val conspectPrefs = remember { context.getSharedPreferences("conspect_prefs", android.content.Context.MODE_PRIVATE) }
+    var sortByName by remember { mutableStateOf(conspectPrefs.getBoolean("sort_by_name", false)) }
     val scope = rememberCoroutineScope()
 
     if (showSubjectsManager) {
@@ -157,6 +160,17 @@ fun ConspectsScreen(
             NotificationBell(unread = unreadNotifications, onClick = onOpenNotifications)
             IconButton(onClick = { showSubjectsManager = true }) {
                 Icon(Icons.Filled.Category, contentDescription = "Предметы", tint = Color(0xFF4338CA))
+            }
+            IconButton(onClick = {
+                sortByName = !sortByName
+                conspectPrefs.edit().putBoolean("sort_by_name", sortByName).apply()
+                Toast.makeText(context, if (sortByName) "Сортировка по названию" else "Сортировка по времени", Toast.LENGTH_SHORT).show()
+            }) {
+                Icon(
+                    Icons.Filled.Sort,
+                    contentDescription = if (sortByName) "Сортировать по времени" else "Сортировать по названию",
+                    tint = if (sortByName) Color(0xFF4338CA) else Color(0xFF94A3B8),
+                )
             }
             IconButton(onClick = { reload += 1 }) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Обновить", tint = Color(0xFF4338CA))
@@ -229,7 +243,14 @@ fun ConspectsScreen(
                 val subjectGroups = items
                     .groupBy { displaySubject(it.subject) }
                     .entries
-                    .sortedWith(compareBy({ it.key == "Без предмета" }, { it.key }))
+                    .map { (subject, rows) ->
+                        subject to if (sortByName) {
+                            rows.sortedWith { a, b -> naturalCompare(conspectTitle(a), conspectTitle(b)) }
+                        } else {
+                            rows
+                        }
+                    }
+                    .sortedWith(compareBy({ it.first == "Без предмета" }, { it.first }))
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
@@ -618,7 +639,7 @@ private fun ConspectRow(
                     )
                 }
                 Text(
-                    text = displayTitle(item.title),
+                    text = displayTitle(conspectTitle(item)),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF1E1B4B),
@@ -656,6 +677,22 @@ private fun ConspectRow(
 }
 
 private fun readingMinutes(length: Int): Int = ((length + 999) / 1000).coerceAtLeast(1)
+
+private fun conspectTitle(item: ConspectSummary): String = item.sourceTitle.ifBlank { item.title }
+
+private fun naturalCompare(a: String, b: String): Int {
+    val left = Regex("(\\d+|\\D+)").findAll(a.lowercase()).map { it.value }.toList()
+    val right = Regex("(\\d+|\\D+)").findAll(b.lowercase()).map { it.value }.toList()
+    for (i in 0 until minOf(left.size, right.size)) {
+        val l = left[i]
+        val r = right[i]
+        val lNum = l.toLongOrNull()
+        val rNum = r.toLongOrNull()
+        val cmp = if (lNum != null && rNum != null) lNum.compareTo(rNum) else l.compareTo(r)
+        if (cmp != 0) return cmp
+    }
+    return left.size.compareTo(right.size)
+}
 
 private fun displayTitle(raw: String): String {
     val title = raw.trim()

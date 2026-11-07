@@ -276,6 +276,8 @@ class MainActivity : ComponentActivity() {
                                 pauseOnInterruptions = recorderState.pauseOnInterruptions,
                                 pauseAudioOnLeave = recorderState.pauseAudioOnLeave,
                                 recognitionLanguage = recorderState.recognitionLanguage,
+                                maxRecordingMinutes = recorderState.maxRecordingMinutes,
+                                onSetMaxRecordingMinutes = viewModel::setMaxRecordingMinutes,
                                 onToggleFarLecturerMode = viewModel::toggleFarLecturerMode,
                                 onSetPauseOnInterruptions = viewModel::setPauseOnInterruptions,
                                 onSetPauseAudioOnLeave = viewModel::setPauseAudioOnLeave,

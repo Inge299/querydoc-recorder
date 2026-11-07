@@ -24,6 +24,8 @@ import com.querydoc.lecturerecorder.media.AudioImportExtractor
 import com.querydoc.lecturerecorder.recording.AudioRecordingService
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 import com.querydoc.lecturerecorder.recording.IdleMicLevelMonitor
+import com.querydoc.lecturerecorder.recording.NotificationHelper
+import com.querydoc.lecturerecorder.recording.RecordingLimitStore
 import com.querydoc.lecturerecorder.recording.RecordingTelemetry
 import com.querydoc.lecturerecorder.work.ConspectCache
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +50,7 @@ class RecorderViewModel(
     private val api = AppGraph.apiClient(app)
     private val conspectJobs = mutableSetOf<String>()
     private val idleMicMonitor = IdleMicLevelMonitor(app)
+    private val initialMaxRecordingMinutes = RecordingLimitStore.current(app)
     private val dateFormatter = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru"))
     private val durationCacheMs = mutableMapOf<String, Long>()
     private val prefs = app.getSharedPreferences(PREFS_NAME, Application.MODE_PRIVATE)
@@ -85,6 +88,7 @@ class RecorderViewModel(
     private var recordingStartedAtMs = 0L
     @Volatile
     private var appForeground = true
+    private var warnedSecondsLeft: Int? = null
     private var pausedAtMs = 0L
     private var pausedDurationMs = 0L
 
@@ -112,6 +116,7 @@ class RecorderViewModel(
         _state.update {
             it.copy(
                 hasMicPermission = hasMic,
+                maxRecordingMinutes = initialMaxRecordingMinutes,
                 statusText = if (hasMic) "Готово" else "Нет доступа к микрофону"
             )
         }
@@ -143,6 +148,7 @@ class RecorderViewModel(
         }
         Analytics.track(app, "recording_started")
         recordingStartedAtMs = System.currentTimeMillis()
+        warnedSecondsLeft = null
         pausedDurationMs = 0L
         pausedAtMs = 0L
         idleMicMonitor.stop()
@@ -222,6 +228,12 @@ class RecorderViewModel(
     fun setRecognitionLanguage(language: RecognitionLanguage) {
         prefs.edit().putString(KEY_RECOGNITION_LANGUAGE, language.name).apply()
         _state.update { it.copy(recognitionLanguage = language) }
+    }
+
+    fun setMaxRecordingMinutes(minutes: Int) {
+        RecordingLimitStore.set(app, minutes)
+        warnedSecondsLeft = null
+        _state.update { it.copy(maxRecordingMinutes = RecordingLimitStore.current(app)) }
     }
 
     fun setEnvironmentProfile(profile: EnvironmentProfile) {
@@ -684,7 +696,41 @@ class RecorderViewModel(
                 val now = System.currentTimeMillis()
                 val activePaused = if (state.value.isRecordingPaused && pausedAtMs > 0L) now - pausedAtMs else 0L
                 val elapsedMs = (now - recordingStartedAtMs - pausedDurationMs - activePaused).coerceAtLeast(0L)
-                _state.update { it.copy(elapsedSeconds = elapsedMs / 1000L) }
+                val limitMinutes = RecordingLimitStore.current(app)
+                if (limitMinutes != state.value.maxRecordingMinutes) {
+                    warnedSecondsLeft = null
+                    _state.update { it.copy(maxRecordingMinutes = limitMinutes) }
+                }
+                val limitSeconds = limitMinutes * 60L
+                val secondsLeft = (limitSeconds - elapsedMs / 1000L).coerceAtLeast(0L)
+                _state.update {
+                    it.copy(
+                        elapsedSeconds = elapsedMs / 1000L,
+                        statusText = when {
+                            it.isRecordingPaused -> it.statusText
+                            secondsLeft <= 0L -> "Запись остановлена: достигнут лимит"
+                            secondsLeft <= 60L -> "До остановки меньше минуты"
+                            secondsLeft <= 300L -> "До остановки ${secondsLeft / 60 + 1} мин"
+                            else -> it.statusText
+                        }
+                    )
+                }
+                if (!state.value.isRecordingPaused) {
+                    if (secondsLeft <= 0L) {
+                        stopRecording()
+                        _state.update { it.copy(statusText = "Запись остановлена: достигнут лимит $limitMinutes мин") }
+                        return@launch
+                    }
+                    val warning = when {
+                        secondsLeft <= 60L -> 60
+                        secondsLeft <= 300L -> 300
+                        else -> null
+                    }
+                    if (warning != null && warnedSecondsLeft != warning) {
+                        warnedSecondsLeft = warning
+                        NotificationHelper.showLimitWarning(app, secondsLeft, limitMinutes, limitMinutes < RecordingLimitStore.HARD_MAX_MINUTES)
+                    }
+                }
                 delay(250L)
             }
         }
