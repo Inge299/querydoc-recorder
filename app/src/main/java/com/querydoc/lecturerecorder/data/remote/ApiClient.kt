@@ -126,6 +126,7 @@ data class PlanInfo(
     val id: String,
     val name: String,
     val priceMonthly: Int,
+    val priceSemester: Int,
     val priceAnnual: Int,
     val monthlyRecordingMinutes: Int,
     val maxSessionMinutes: Int,
@@ -893,6 +894,7 @@ class ApiClient(context: Context) {
                     id = item.optString("id"),
                     name = item.optString("name"),
                     priceMonthly = item.optInt("priceMonthly"),
+                    priceSemester = item.optInt("priceSemester"),
                     priceAnnual = item.optInt("priceAnnual"),
                     monthlyRecordingMinutes = limits?.optInt("monthlyRecordingMinutes") ?: 0,
                     maxSessionMinutes = limits?.optInt("maxSessionMinutes") ?: 0,
@@ -936,9 +938,9 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun createPayment(planId: String): ApiResult<String> = withContext(Dispatchers.IO) {
+    suspend fun createPayment(planId: String, period: String = "month"): ApiResult<String> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
-        val body = JSONObject().put("planId", planId).toString()
+        val body = JSONObject().put("planId", planId).put("period", period).toString()
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/billing/create")
             .post(body.toRequestBody(JSON))

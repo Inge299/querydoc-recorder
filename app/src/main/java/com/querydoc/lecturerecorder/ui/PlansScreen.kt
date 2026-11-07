@@ -56,6 +56,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
     var payments by remember { mutableStateOf<List<PaymentHistoryItem>>(emptyList()) }
     var buyingId by remember { mutableStateOf("") }
     var buyingTopUp by remember { mutableStateOf(false) }
+    var billingPeriod by remember { mutableStateOf("month") }
 
     suspend fun reload() {
         loading = true
@@ -205,6 +206,21 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                     }
                 }
 
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    listOf("month" to "Месяц", "semester" to "Семестр", "year" to "Год").forEach { (value, label) ->
+                        androidx.compose.material3.OutlinedButton(
+                            onClick = { billingPeriod = value },
+                            modifier = Modifier.weight(1f),
+                            colors = androidx.compose.material3.ButtonDefaults.outlinedButtonColors(
+                                containerColor = if (billingPeriod == value) Color(0xFFEEF2FF) else Color.Transparent,
+                            ),
+                        ) { Text(label, color = if (billingPeriod == value) Color(0xFF4338CA) else Color(0xFF64748B)) }
+                    }
+                }
+
                 data.plans.forEach { plan ->
                     PlanCard(
                         plan = plan,
@@ -212,6 +228,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         testBilling = data.testBilling,
                         billingReady = data.billingReady,
                         busy = buyingId == plan.id,
+                        period = billingPeriod,
                         onBuy = {
                             if (!data.testBilling && !data.billingReady) return@PlanCard
                             Analytics.track(context, "pay_click", mapOf("planId" to plan.id))
@@ -227,9 +244,9 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                                         is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
                                     }
                                 } else {
-                                    when (val result = api.createPayment(plan.id)) {
+                                    when (val result = api.createPayment(plan.id, billingPeriod)) {
                                         is ApiResult.Ok -> {
-                                            Toast.makeText(context, "Открываем оплату на 30 дней", Toast.LENGTH_LONG).show()
+                                            Toast.makeText(context, "Открываем оплату пакета", Toast.LENGTH_LONG).show()
                                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.value))) }
                                         }
                                         is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
@@ -246,7 +263,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
 }
 
 @Composable
-private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, billingReady: Boolean, busy: Boolean, onBuy: () -> Unit) {
+private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, billingReady: Boolean, busy: Boolean, period: String, onBuy: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
@@ -255,7 +272,9 @@ private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, bil
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(plan.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
-                Text(if (plan.priceMonthly == 0) "Бесплатно" else "${plan.priceMonthly} ₽/мес", fontWeight = FontWeight.Bold, color = Color(0xFF4338CA))
+                val price = when (period) { "year" -> plan.priceAnnual; "semester" -> plan.priceSemester; else -> plan.priceMonthly }
+                val suffix = when (period) { "year" -> "год"; "semester" -> "семестр"; else -> "мес" }
+                Text(if (price == 0) "Бесплатно" else "$price ₽/$suffix", fontWeight = FontWeight.Bold, color = Color(0xFF4338CA))
             }
             Text(
                 "${plan.monthlyRecordingMinutes / 60} ч записей · ${plan.dailyQa} вопросов/день · хранение ${plan.storageDays} дн.${if (plan.id == "free") " (в бете может дольше)" else ""}",
@@ -271,7 +290,7 @@ private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, bil
                     current -> "Текущий тариф"
                     busy -> "Активируем…"
                     testBilling -> "Активировать тестовый тариф"
-                    billingReady -> "Оплатить 30 дней"
+                    billingReady -> when (period) { "year" -> "Оплатить год"; "semester" -> "Оплатить семестр"; else -> "Оплатить месяц" }
                     else -> "Оплата скоро"
                 })
             }
