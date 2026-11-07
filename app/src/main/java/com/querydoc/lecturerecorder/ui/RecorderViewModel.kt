@@ -21,6 +21,7 @@ import com.querydoc.lecturerecorder.data.local.PlaybackPositionStore
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.media.AudioImportExtractor
+import com.querydoc.lecturerecorder.media.DocumentImportExtractor
 import com.querydoc.lecturerecorder.recording.AudioRecordingService
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 import com.querydoc.lecturerecorder.recording.IdleMicLevelMonitor
@@ -274,6 +275,18 @@ class RecorderViewModel(
     }
 
     fun startImport(uri: Uri) {
+        val mime = app.contentResolver.getType(uri).orEmpty().lowercase()
+        val extension = (uri.lastPathSegment.orEmpty().substringAfterLast('.', "")).lowercase()
+        if (
+            mime == "application/pdf" ||
+            mime == "text/plain" ||
+            mime == "text/markdown" ||
+            mime.contains("wordprocessingml.document") ||
+            extension in setOf("pdf", "docx", "txt", "md", "markdown")
+        ) {
+            startDocumentImport(uri)
+            return
+        }
         val current = state.value.importState
         if (current?.stage == ImportStage.PREPARING || current?.stage == ImportStage.UPLOADING || current?.stage == ImportStage.PROCESSING) return
         _state.update { it.copy(importState = ImportUiState(ImportStage.PREPARING, message = "Готовим аудио…")) }
@@ -356,6 +369,56 @@ class RecorderViewModel(
             } catch (exception: Exception) {
                 _state.update {
                     it.copy(importState = ImportUiState(ImportStage.ERROR, preparedFile?.name.orEmpty(), exception.message ?: "Не удалось импортировать файл"))
+                }
+            } finally {
+                preparedFile?.delete()
+            }
+        }
+    }
+
+    private fun startDocumentImport(uri: Uri) {
+        val current = state.value.importState
+        if (current?.stage == ImportStage.PREPARING || current?.stage == ImportStage.UPLOADING || current?.stage == ImportStage.PROCESSING) return
+        _state.update { it.copy(importState = ImportUiState(ImportStage.PREPARING, message = "Готовим документ…")) }
+        viewModelScope.launch {
+            var preparedFile: File? = null
+            try {
+                val prepared = DocumentImportExtractor.prepare(app, uri).getOrElse { throw it }
+                preparedFile = prepared.file
+                _state.update {
+                    it.copy(importState = ImportUiState(ImportStage.UPLOADING, prepared.fileName, "Загружаем документ в облако…"))
+                }
+                val target = when (val result = api.initiateDocumentUpload(prepared.fileName, prepared.mimeType, prepared.file.length())) {
+                    is ApiResult.Ok -> result.value
+                    is ApiResult.Failure -> throw IllegalStateException(result.message)
+                }
+                val materialFileId = target.upload.materialFileId ?: run {
+                    if (!target.upload.duplicate) {
+                        when (val put = api.putObject(target.upload, prepared.file, prepared.mimeType)) {
+                            is ApiResult.Ok -> Unit
+                            is ApiResult.Failure -> throw IllegalStateException(put.message)
+                        }
+                    }
+                    when (val completed = api.completeDocumentUpload(target.upload.uploadSessionId)) {
+                        is ApiResult.Ok -> completed.value
+                        is ApiResult.Failure -> throw IllegalStateException(completed.message)
+                    }
+                }
+                prepared.file.delete()
+                preparedFile = null
+                _state.update {
+                    it.copy(importState = ImportUiState(ImportStage.PROCESSING, prepared.fileName, "Извлекаем текст и готовим конспект…"))
+                }
+                when (val conspect = api.createDocumentConspect(materialFileId)) {
+                    is ApiResult.Ok -> {
+                        _state.update { it.copy(importState = ImportUiState(ImportStage.READY, prepared.fileName, "Конспект документа готов", materialFileId)) }
+                        refreshUsage()
+                    }
+                    is ApiResult.Failure -> throw IllegalStateException(conspect.message)
+                }
+            } catch (exception: Exception) {
+                _state.update {
+                    it.copy(importState = ImportUiState(ImportStage.ERROR, preparedFile?.name.orEmpty(), exception.message ?: "Не удалось импортировать документ"))
                 }
             } finally {
                 preparedFile?.delete()

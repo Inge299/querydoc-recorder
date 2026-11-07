@@ -31,6 +31,10 @@ data class PresignedUpload(
     val materialFileId: String?,
 )
 
+data class DocumentUploadTarget(
+    val upload: PresignedUpload,
+)
+
 data class ConspectState(
     val sessionId: String,
     val status: String,
@@ -503,10 +507,11 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun putObject(upload: PresignedUpload, file: File): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    suspend fun putObject(upload: PresignedUpload, file: File, mimeType: String? = null): ApiResult<Unit> = withContext(Dispatchers.IO) {
         val builder = Request.Builder().url(upload.uploadUrl)
         upload.uploadHeaders.forEach { (key, value) -> builder.header(key, value) }
-        builder.method(upload.uploadMethod, file.asRequestBody(FILE_MEDIA_TYPE))
+        val mediaType = mimeType?.toMediaTypeOrNull() ?: FILE_MEDIA_TYPE
+        builder.method(upload.uploadMethod, file.asRequestBody(mediaType))
         val request = builder.build()
         val response = execute(request) ?: return@withContext networkFailure()
         response.use { response ->
@@ -515,6 +520,85 @@ class ApiClient(context: Context) {
                 Diagnostics.warn(appContext, "s3 put failed status=${response.code}")
                 ApiResult.Failure(response.code, "s3_put_failed", "S3 отклонил загрузку (${response.code})", response.code >= 500)
             }
+        }
+    }
+
+    suspend fun initiateDocumentUpload(fileName: String, mimeType: String, sizeBytes: Long): ApiResult<DocumentUploadTarget> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject()
+            .put("fileName", fileName)
+            .put("mimeType", mimeType)
+            .put("sizeBytes", sizeBytes)
+            .put("ingestKind", "file")
+        val request = Request.Builder()
+            .url("$baseUrl/api/materials/direct-uploads/initiate")
+            .post(payload.toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось подготовить загрузку документа" }, response.code >= 500)
+            }
+            if (json.optBoolean("duplicate") && json.optString("materialFileId").isNotBlank()) {
+                return@use ApiResult.Ok(DocumentUploadTarget(
+                    upload = PresignedUpload("", "", emptyMap(), "", true, json.optString("materialFileId")),
+                ))
+            }
+            val session = json.optJSONObject("uploadSession")
+            val target = json.optJSONObject("uploadTarget")
+            if (session == null || target == null) return@use ApiResult.Failure(500, "", "Сервер не вернул параметры загрузки", true)
+            val headersJson = target.optJSONObject("headers")
+            val headers = mutableMapOf<String, String>()
+            headersJson?.keys()?.forEach { key -> headers[key] = headersJson.optString(key) }
+            ApiResult.Ok(DocumentUploadTarget(
+                upload = PresignedUpload(
+                    uploadUrl = target.optString("url"),
+                    uploadMethod = target.optString("method"),
+                    uploadHeaders = headers,
+                    uploadSessionId = session.optString("id"),
+                    duplicate = false,
+                    materialFileId = null,
+                ),
+            ))
+        }
+    }
+
+    suspend fun completeDocumentUpload(uploadSessionId: String): ApiResult<String> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("uploadSessionId", uploadSessionId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/materials/direct-uploads/complete")
+            .post(payload.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            val id = json?.optJSONObject("file")?.optString("id").orEmpty()
+            if (response.isSuccessful && id.isNotBlank()) ApiResult.Ok(id)
+            else ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось завершить загрузку документа" }, response.code >= 500)
+        }
+    }
+
+    suspend fun createDocumentConspect(materialFileId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("materialFileId", materialFileId).toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/documents/conspect")
+            .post(payload.toRequestBody(JSON))
+            .build()
+        val longClient = client.newBuilder().readTimeout(180, TimeUnit.SECONDS).build()
+        val response = try { longClient.newCall(request).execute() } catch (error: Exception) {
+            Diagnostics.warn(appContext, "document conspect network error: ${error.message}")
+            null
+        } ?: return@withContext networkFailure()
+        response.use { response ->
+            val raw = response.body?.string().orEmpty()
+            val json = runCatching { JSONObject(raw) }.getOrNull()
+            if (response.isSuccessful && json?.optBoolean("accepted") == true) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Не удалось подготовить конспект" }, response.code >= 500)
         }
     }
 

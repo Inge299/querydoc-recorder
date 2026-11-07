@@ -263,7 +263,7 @@ class MainActivity : ComponentActivity() {
                             onDismissConspect = viewModel::dismissConspect,
                             onOpenConspects = { showConspects = true },
                             onOpenSettings = { showSettings = true },
-                            onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*")) },
+                            onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*", "application/pdf", "text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
                             onDismissImport = viewModel::clearImportState,
                             unreadNotifications = unreadNotifications,
                             onOpenNotifications = { showNotifications = true }
