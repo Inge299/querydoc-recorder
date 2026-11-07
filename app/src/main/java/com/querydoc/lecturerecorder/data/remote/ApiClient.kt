@@ -133,6 +133,7 @@ data class PlanInfo(
     val dailyQa: Int,
     val dailyStudyKit: Int,
     val monthlyDocuments: Int,
+    val storageBytes: Long,
     val storageDays: Int,
 )
 
@@ -901,6 +902,7 @@ class ApiClient(context: Context) {
                     dailyQa = limits?.optInt("dailyQa") ?: 0,
                     dailyStudyKit = limits?.optInt("dailyStudyKit") ?: 0,
                     monthlyDocuments = limits?.optInt("monthlyDocuments") ?: 0,
+                    storageBytes = limits?.optLong("storageBytes") ?: 0L,
                     storageDays = limits?.optInt("storageDays") ?: 0,
                 )
             }
