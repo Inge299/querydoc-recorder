@@ -8,7 +8,8 @@ object AudioStorageStore {
     private const val PREFS = "recorder_preferences"
     private const val KEY_DAYS = "audio_retention_days"
     private const val KEY_LIMIT = "audio_storage_limit_bytes"
-    val retentionOptions = listOf(3, 7, 14)
+    fun retentionOptions(storageDays: Int): List<Int> =
+        listOf(3, 7, 14, 30, 90).filter { it <= storageDays.coerceAtLeast(7) }.distinct()
     val limitOptionsGb = listOf(1, 2, 4, 8)
 
     fun retentionDays(context: Context): Int =

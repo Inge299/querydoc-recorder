@@ -280,6 +280,7 @@ class MainActivity : ComponentActivity() {
                                 onSetMaxRecordingMinutes = viewModel::setMaxRecordingMinutes,
                                 audioRetentionDays = recorderState.audioRetentionDays,
                                 audioStorageLimitGb = recorderState.audioStorageLimitGb,
+                                storageDays = recorderState.storageDays,
                                 onSetAudioRetentionDays = viewModel::setAudioRetentionDays,
                                 onSetAudioStorageLimitGb = viewModel::setAudioStorageLimitGb,
                                 onClearLocalAudio = viewModel::clearLocalAudioCache,
@@ -292,7 +293,6 @@ class MainActivity : ComponentActivity() {
                                 onOpenPlans = { showPlans = true },
                                 onOpenNotifications = { showNotifications = true },
                                 onOpenSupport = { showSupport = true },
-                                onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*")) },
                                 onDeleteAccount = { password, callback ->
                                     scope.launch {
                                         when (val result = api.deleteAccount(password)) {

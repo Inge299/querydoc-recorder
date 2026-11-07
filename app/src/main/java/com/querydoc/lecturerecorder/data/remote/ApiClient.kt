@@ -112,6 +112,9 @@ data class UsageSummary(
     val studyKitUsed: Int,
     val studyKitLimit: Int,
     val studyKitRemaining: Int,
+    val planId: String = "",
+    val planName: String = "",
+    val storageDays: Int = 14,
 )
 
 data class PlanInfo(
@@ -648,6 +651,7 @@ class ApiClient(context: Context) {
             val recording = json.optJSONObject("recording")
             val qa = json.optJSONObject("qa")
             val study = json.optJSONObject("studyKit")
+            val plan = json.optJSONObject("plan")
             ApiResult.Ok(
                 UsageSummary(
                     recordingUsedMinutes = recording?.optInt("usedMinutes") ?: 0,
@@ -659,6 +663,9 @@ class ApiClient(context: Context) {
                     studyKitUsed = study?.optInt("used") ?: 0,
                     studyKitLimit = study?.optInt("limit") ?: 5,
                     studyKitRemaining = study?.optInt("remaining") ?: 0,
+                    planId = plan?.optString("id").orEmpty(),
+                    planName = plan?.optString("name").orEmpty(),
+                    storageDays = json.optInt("storageDays", 14).coerceAtLeast(3),
                 ),
             )
         }

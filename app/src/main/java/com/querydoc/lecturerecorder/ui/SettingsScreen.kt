@@ -73,6 +73,7 @@ fun SettingsScreen(
     onSetMaxRecordingMinutes: (Int) -> Unit,
     audioRetentionDays: Int,
     audioStorageLimitGb: Int,
+    storageDays: Int,
     onSetAudioRetentionDays: (Int) -> Unit,
     onSetAudioStorageLimitGb: (Int) -> Unit,
     onClearLocalAudio: () -> Unit,
@@ -86,7 +87,6 @@ fun SettingsScreen(
     onOpenPlans: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenSupport: () -> Unit,
-    onOpenImport: () -> Unit,
     onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -160,14 +160,6 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "МИКРОФОН") {
-                SettingRow(
-                    icon = Icons.Filled.UploadFile,
-                    title = "Импорт лекции",
-                    subtitle = "Аудио или видео → аудиодорожка",
-                    onClick = onOpenImport,
-                    trailing = { Chevron() },
-                )
-                SettingDivider()
                 SettingRow(
                     icon = Icons.Filled.Info,
                     title = "Максимальная длина записи",
@@ -380,7 +372,8 @@ fun SettingsScreen(
     }
 
     if (showRetentionDialog) {
-        val options = listOf(3, 7, 14)
+        val effectiveStorageDays = usage?.storageDays ?: storageDays
+        val options = com.querydoc.lecturerecorder.recording.AudioStorageStore.retentionOptions(effectiveStorageDays)
         ChoiceDialog(
             title = "Сколько хранить аудио",
             options = options.map { "$it дней" },

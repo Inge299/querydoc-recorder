@@ -236,7 +236,8 @@ class RecorderViewModel(
     }
 
     fun setAudioRetentionDays(days: Int) {
-        AudioStorageStore.setRetentionDays(app, days)
+        val allowed = state.value.storageDays.coerceAtLeast(7)
+        AudioStorageStore.setRetentionDays(app, days.coerceAtMost(allowed))
         _state.update { it.copy(audioRetentionDays = AudioStorageStore.retentionDays(app)) }
     }
 
@@ -828,10 +829,16 @@ class RecorderViewModel(
         viewModelScope.launch {
             when (val result = api.usage()) {
                 is ApiResult.Ok -> _state.update {
+                    val allowedDays = result.value.storageDays.coerceAtLeast(7)
+                    if (it.audioRetentionDays > allowedDays) {
+                        AudioStorageStore.setRetentionDays(app, allowedDays)
+                    }
                     it.copy(
                         recordingUsedMinutes = result.value.recordingUsedMinutes,
                         recordingLimitMinutes = result.value.recordingLimitMinutes,
                         recordingRemainingMinutes = result.value.recordingRemainingMinutes,
+                        storageDays = allowedDays,
+                        audioRetentionDays = if (it.audioRetentionDays > allowedDays) allowedDays else it.audioRetentionDays,
                         usageLoaded = true,
                     )
                 }
