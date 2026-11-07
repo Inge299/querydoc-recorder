@@ -210,6 +210,13 @@ class RecorderViewModel(
                 statusText = "Запись остановлена"
             )
         }
+        val recordedSeconds = state.value.elapsedSeconds
+        if (recordedSeconds > 0L) {
+            Analytics.track(app, "session_abandoned", mapOf(
+                "seconds" to recordedSeconds.toString(),
+                "reason" to "manual_stop",
+            ))
+        }
         startIdleMicIfAllowed()
         refreshUsage()
     }
