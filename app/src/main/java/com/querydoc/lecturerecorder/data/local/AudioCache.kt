@@ -2,6 +2,7 @@ package com.querydoc.lecturerecorder.data.local
 
 import android.content.Context
 import com.querydoc.lecturerecorder.data.remote.AudioSourceChunk
+import com.querydoc.lecturerecorder.recording.AudioStorageStore
 import java.io.File
 
 data class CachedAudio(
@@ -17,13 +18,13 @@ data class CachedAudio(
 object AudioCache {
     private const val ROOT = "audio_cache"
     private const val MANIFEST = "manifest.txt"
-    private const val TTL_MS = 7L * 24L * 60L * 60L * 1_000L
+    private fun ttlMs(context: Context): Long = AudioStorageStore.retentionDays(context) * 24L * 60L * 60L * 1_000L
 
     fun get(context: Context, sessionId: String): CachedAudio? {
         val dir = sessionDir(context, sessionId)
         if (!dir.isDirectory) return null
         val manifest = File(dir, MANIFEST)
-        if (!manifest.isFile || System.currentTimeMillis() - manifest.lastModified() > TTL_MS) {
+        if (!manifest.isFile || System.currentTimeMillis() - manifest.lastModified() > ttlMs(context)) {
             clear(context, sessionId)
             return null
         }
@@ -92,7 +93,7 @@ object AudioCache {
         root.listFiles()?.forEach { dir ->
             if (!dir.isDirectory) return@forEach
             val manifest = File(dir, MANIFEST)
-            if (!manifest.isFile || now - manifest.lastModified() > TTL_MS) {
+            if (!manifest.isFile || now - manifest.lastModified() > ttlMs(context)) {
                 dir.deleteRecursively()
             }
         }

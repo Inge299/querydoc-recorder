@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Card
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -70,6 +71,11 @@ fun SettingsScreen(
     recognitionLanguage: RecognitionLanguage,
     maxRecordingMinutes: Int,
     onSetMaxRecordingMinutes: (Int) -> Unit,
+    audioRetentionDays: Int,
+    audioStorageLimitGb: Int,
+    onSetAudioRetentionDays: (Int) -> Unit,
+    onSetAudioStorageLimitGb: (Int) -> Unit,
+    onClearLocalAudio: () -> Unit,
     onToggleFarLecturerMode: () -> Unit,
     onSetPauseOnInterruptions: (Boolean) -> Unit,
     onSetPauseAudioOnLeave: (Boolean) -> Unit,
@@ -89,6 +95,9 @@ fun SettingsScreen(
     var showAcousticDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showLimitDialog by remember { mutableStateOf(false) }
+    var showRetentionDialog by remember { mutableStateOf(false) }
+    var showStorageLimitDialog by remember { mutableStateOf(false) }
+    var clearAudioConfirm by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
     var deleteDialog by remember { mutableStateOf(false) }
@@ -199,6 +208,30 @@ fun SettingsScreen(
                     subtitle = "Останавливать аудио при уходе с вкладки «Аудио»",
                     checked = pauseAudioOnLeave,
                     onCheckedChange = onSetPauseAudioOnLeave,
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.Info,
+                    title = "Хранение аудио",
+                    subtitle = "$audioRetentionDays дней",
+                    onClick = { showRetentionDialog = true },
+                    trailing = { Chevron() },
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.Info,
+                    title = "Лимит аудио на устройстве",
+                    subtitle = "$audioStorageLimitGb ГБ",
+                    onClick = { showStorageLimitDialog = true },
+                    trailing = { Chevron() },
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.DeleteForever,
+                    title = "Удалить аудио с устройства",
+                    subtitle = "Конспекты и транскрипты останутся",
+                    onClick = { clearAudioConfirm = true },
+                    trailing = { Chevron() },
                 )
             }
 
@@ -343,6 +376,51 @@ fun SettingsScreen(
                 onSetMaxRecordingMinutes(options[index])
             },
             onDismiss = { showLimitDialog = false },
+        )
+    }
+
+    if (showRetentionDialog) {
+        val options = listOf(3, 7, 14)
+        ChoiceDialog(
+            title = "Сколько хранить аудио",
+            options = options.map { "$it дней" },
+            selectedIndex = options.indexOf(audioRetentionDays).coerceAtLeast(0),
+            onSelect = { index ->
+                showRetentionDialog = false
+                onSetAudioRetentionDays(options[index])
+            },
+            onDismiss = { showRetentionDialog = false },
+        )
+    }
+
+    if (showStorageLimitDialog) {
+        val options = listOf(1, 2, 4, 8)
+        ChoiceDialog(
+            title = "Лимит аудио на устройстве",
+            options = options.map { "$it ГБ" },
+            selectedIndex = options.indexOf(audioStorageLimitGb).coerceAtLeast(0),
+            onSelect = { index ->
+                showStorageLimitDialog = false
+                onSetAudioStorageLimitGb(options[index])
+            },
+            onDismiss = { showStorageLimitDialog = false },
+        )
+    }
+
+    if (clearAudioConfirm) {
+        AlertDialog(
+            onDismissRequest = { clearAudioConfirm = false },
+            title = { Text("Удалить аудио с устройства?") },
+            text = { Text("Локальные аудиофайлы будут удалены. Конспекты и транскрипты останутся, аудио можно будет скачать из облака, если срок хранения не истёк.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    clearAudioConfirm = false
+                    onClearLocalAudio()
+                }) { Text("Удалить", color = Color(0xFFDC2626)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { clearAudioConfirm = false }) { Text("Отмена") }
+            },
         )
     }
 

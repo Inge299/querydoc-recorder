@@ -15,6 +15,8 @@ data class RecorderUiState(
     val energySaverEnabled: Boolean = true,
     val elapsedSeconds: Long = 0L,
     val maxRecordingMinutes: Int = 90,
+    val audioRetentionDays: Int = 7,
+    val audioStorageLimitGb: Int = 2,
     val remainingRecordSeconds: Long = 0L,
     val recordingUsedMinutes: Int = 0,
     val recordingLimitMinutes: Int = 180,

@@ -26,6 +26,7 @@ import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 import com.querydoc.lecturerecorder.recording.IdleMicLevelMonitor
 import com.querydoc.lecturerecorder.recording.NotificationHelper
 import com.querydoc.lecturerecorder.recording.RecordingLimitStore
+import com.querydoc.lecturerecorder.recording.AudioStorageStore
 import com.querydoc.lecturerecorder.recording.RecordingTelemetry
 import com.querydoc.lecturerecorder.work.ConspectCache
 import kotlinx.coroutines.Dispatchers
@@ -51,6 +52,8 @@ class RecorderViewModel(
     private val conspectJobs = mutableSetOf<String>()
     private val idleMicMonitor = IdleMicLevelMonitor(app)
     private val initialMaxRecordingMinutes = RecordingLimitStore.current(app)
+    private val initialAudioRetentionDays = AudioStorageStore.retentionDays(app)
+    private val initialAudioStorageLimitGb = (AudioStorageStore.limitBytes(app) / (1024L * 1024L * 1024L)).toInt().coerceAtLeast(1)
     private val dateFormatter = SimpleDateFormat("dd.MM.yyyy HH:mm", Locale("ru"))
     private val durationCacheMs = mutableMapOf<String, Long>()
     private val prefs = app.getSharedPreferences(PREFS_NAME, Application.MODE_PRIVATE)
@@ -117,6 +120,8 @@ class RecorderViewModel(
             it.copy(
                 hasMicPermission = hasMic,
                 maxRecordingMinutes = initialMaxRecordingMinutes,
+                audioRetentionDays = initialAudioRetentionDays,
+                audioStorageLimitGb = initialAudioStorageLimitGb,
                 statusText = if (hasMic) "Готово" else "Нет доступа к микрофону"
             )
         }
@@ -228,6 +233,27 @@ class RecorderViewModel(
     fun setRecognitionLanguage(language: RecognitionLanguage) {
         prefs.edit().putString(KEY_RECOGNITION_LANGUAGE, language.name).apply()
         _state.update { it.copy(recognitionLanguage = language) }
+    }
+
+    fun setAudioRetentionDays(days: Int) {
+        AudioStorageStore.setRetentionDays(app, days)
+        _state.update { it.copy(audioRetentionDays = AudioStorageStore.retentionDays(app)) }
+    }
+
+    fun setAudioStorageLimitGb(gb: Int) {
+        AudioStorageStore.setLimitBytes(app, gb * 1024L * 1024L * 1024L)
+        _state.update { it.copy(audioStorageLimitGb = gb) }
+    }
+
+    fun clearLocalAudioCache() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val dao = AppGraph.db(app).uploadQueueDao()
+            dao.allAudioItems().forEach { item ->
+                runCatching { File(item.filePath).delete() }
+            }
+            File(app.filesDir, "audio_cache").deleteRecursively()
+            _state.update { it.copy(playbackStatus = "Аудио удалено с устройства") }
+        }
     }
 
     fun setMaxRecordingMinutes(minutes: Int) {

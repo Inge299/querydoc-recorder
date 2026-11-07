@@ -242,7 +242,7 @@ class AudioRecordingService : Service() {
         serviceScope.launch {
             try {
                 val now = System.currentTimeMillis()
-                val deleteAfter = now + AppConfig.Storage.cleanupAfterDays * 24L * 60L * 60L * 1_000L
+                val deleteAfter = now + AudioStorageStore.retentionDays(applicationContext) * 24L * 60L * 60L * 1_000L
                 AppGraph.db(applicationContext).uploadQueueDao().upsert(
                     UploadQueueEntity(
                         id = UUID.randomUUID().toString(),

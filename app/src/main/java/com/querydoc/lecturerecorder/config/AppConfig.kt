@@ -29,6 +29,6 @@ object AppConfig {
     object Storage {
         // Keep local files for manual replay and deferred cleanup policy.
         const val keepLocalAudioAfterUpload: Boolean = true
-        const val cleanupAfterDays: Long = 3
+        const val cleanupAfterDays: Long = 7
     }
 }
