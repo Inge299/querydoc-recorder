@@ -134,12 +134,20 @@ data class PlanInfo(
     val storageDays: Int,
 )
 
+data class TopUpInfo(
+    val id: String,
+    val name: String,
+    val priceRub: Int,
+    val minutes: Int,
+)
+
 data class PlansPayload(
     val currentPlanId: String,
     val currentPlanName: String,
     val testBilling: Boolean,
     val billingReady: Boolean,
     val plans: List<PlanInfo>,
+    val topUp: TopUpInfo? = null,
 )
 
 data class InboxNotification(
@@ -892,13 +900,37 @@ class ApiClient(context: Context) {
                     storageDays = limits?.optInt("storageDays") ?: 0,
                 )
             }
+            val topUpJson = json.optJSONObject("topUp")
             ApiResult.Ok(PlansPayload(
                 currentPlanId = current?.optString("planId").orEmpty(),
                 currentPlanName = current?.optString("planName").orEmpty(),
                 testBilling = json.optBoolean("testBilling", false),
                 billingReady = json.optBoolean("billingReady", false),
                 plans = plans,
+                topUp = topUpJson?.let {
+                    TopUpInfo(
+                        id = it.optString("id"),
+                        name = it.optString("name"),
+                        priceRub = it.optInt("priceRub"),
+                        minutes = it.optInt("minutes"),
+                    )
+                },
             ))
+        }
+    }
+
+    suspend fun createTopUp(): ApiResult<String> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/billing/topup")
+            .post("{}".toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val url = json?.optString("confirmationUrl").orEmpty()
+            if (response.isSuccessful && url.isNotBlank()) ApiResult.Ok(url)
+            else ApiResult.Failure(response.code, json?.optString("code").orEmpty(), json?.optString("error").orEmpty().ifBlank { "Не удалось создать платёж" }, response.code >= 500)
         }
     }
 

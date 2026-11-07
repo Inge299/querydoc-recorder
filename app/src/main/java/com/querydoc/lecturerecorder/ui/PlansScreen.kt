@@ -55,6 +55,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
     var payload by remember { mutableStateOf<PlansPayload?>(null) }
     var payments by remember { mutableStateOf<List<PaymentHistoryItem>>(emptyList()) }
     var buyingId by remember { mutableStateOf("") }
+    var buyingTopUp by remember { mutableStateOf(false) }
 
     suspend fun reload() {
         loading = true
@@ -167,6 +168,40 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         )
                     }
                 }
+                data.topUp?.let { topUp ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(topUp.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+                            Text("+${topUp.minutes} минут записи · ${topUp.priceRub} ₽", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                            Text("Пакет действует в текущем месяце. Не включает автопродление.", style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
+                            Button(
+                                onClick = {
+                                    if (!data.billingReady) return@Button
+                                    buyingTopUp = true
+                                    scope.launch {
+                                        when (val result = api.createTopUp()) {
+                                            is ApiResult.Ok -> {
+                                                Toast.makeText(context, "Открываем оплату пакета", Toast.LENGTH_LONG).show()
+                                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.value))) }
+                                            }
+                                            is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                                        }
+                                        buyingTopUp = false
+                                    }
+                                },
+                                enabled = data.billingReady && !buyingTopUp,
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            ) {
+                                Text(if (buyingTopUp) "Создаём платёж…" else if (data.billingReady) "Докупить 5 часов" else "Оплата скоро")
+                            }
+                        }
+                    }
+                }
+
                 data.plans.forEach { plan ->
                     PlanCard(
                         plan = plan,
