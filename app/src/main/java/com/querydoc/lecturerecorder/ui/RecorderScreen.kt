@@ -766,6 +766,16 @@ private fun RecordingItemRow(
                         color = Color(0xFF7C3AED),
                     )
                 }
+                item.conspectStatus == "payment_required" -> {
+                    Text(
+                        text = "Запись сохранена. Нужна оплата для расшифровки.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFB45309),
+                    )
+                    TextButton(onClick = { onRequestConspect(item.id) }) {
+                        Text("Докупить часы", color = Color(0xFF4338CA))
+                    }
+                }
                 item.conspectStatus == "failed" -> {
                     Text(
                         text = "Не удалось распознать — попробуйте ещё раз",

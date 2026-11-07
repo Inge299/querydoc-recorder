@@ -63,6 +63,11 @@ class ConspectWorker(
                         Diagnostics.warn(applicationContext, "ConspectWorker: authorization required")
                         return Result.failure()
                     }
+                    if (result.status == 429) {
+                        notifyFailed(sessionId, "Запись сохранена. Для расшифровки нужна оплата.")
+                        Diagnostics.warn(applicationContext, "ConspectWorker: payment required $sessionId")
+                        return Result.success()
+                    }
                     if (result.status == 422) {
                         runCatching { api.deleteAudioSession(sessionId) }
                         cleanupShortSession(sessionId)
