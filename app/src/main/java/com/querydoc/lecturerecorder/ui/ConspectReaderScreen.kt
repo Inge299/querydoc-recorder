@@ -96,6 +96,7 @@ fun ConspectReaderScreen(
     api: ApiClient,
     sessionId: String,
     initialMarkdown: String?,
+    sourceType: String = "",
     playerState: RecorderUiState,
     pauseAudioOnLeave: Boolean,
     onPlay: (String, Float?) -> Unit,
@@ -106,6 +107,7 @@ fun ConspectReaderScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val isDocument = sourceType == "pdf" || sourceType == "docx" || sourceType == "transcript"
     var markdown by remember { mutableStateOf(initialMarkdown.orEmpty()) }
     var loading by remember { mutableStateOf(markdown.isBlank()) }
     var offline by remember { mutableStateOf(false) }
@@ -208,7 +210,7 @@ fun ConspectReaderScreen(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = when (tab) { 0 -> "Конспект"; 1 -> "Транскрипт"; 2 -> "Аудиозапись"; else -> "Вопросы по лекции" },
+                    text = when (tab) { 0 -> "Конспект"; 1 -> if (isDocument) "Текст документа" else "Транскрипт"; 2 -> "Аудиозапись"; else -> if (isDocument) "Вопросы по материалу" else "Вопросы по лекции" },
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF0F172A),
@@ -257,7 +259,9 @@ fun ConspectReaderScreen(
         ) {
             ReaderTab("Конспект", selected = tab == 0, modifier = Modifier.weight(1f)) { selectTab(0) }
             ReaderTab("Текст", selected = tab == 1, modifier = Modifier.weight(1f)) { selectTab(1) }
-            ReaderTab("Аудио", selected = tab == 2, modifier = Modifier.weight(1f)) { selectTab(2) }
+            if (!isDocument) {
+                ReaderTab("Аудио", selected = tab == 2, modifier = Modifier.weight(1f)) { selectTab(2) }
+            }
             ReaderTab("Вопрос", selected = tab == 3, modifier = Modifier.weight(1f)) { selectTab(3) }
         }
 
@@ -341,7 +345,7 @@ fun ConspectReaderScreen(
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                             Text(
-                                text = "Распознанная речь",
+                                text = if (isDocument) "Текст документа" else "Распознанная речь",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(0xFF0F172A),

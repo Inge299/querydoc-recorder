@@ -107,6 +107,7 @@ class MainActivity : ComponentActivity() {
             var unreadNotifications by remember { mutableStateOf(0) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
+            var readerSourceType by rememberSaveable { mutableStateOf("") }
             val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
                 if (uri != null) {
                     viewModel.startImport(uri)
@@ -332,6 +333,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = { showConspects = false },
                                 onOpen = { summary ->
                                     readerMarkdown = summary.markdown
+                                    readerSourceType = summary.sourceType
                                     readerSession = summary.sessionId
                                 },
                                 unreadNotifications = unreadNotifications,
@@ -341,6 +343,7 @@ class MainActivity : ComponentActivity() {
                                 api = api,
                                 sessionId = readerSession.orEmpty(),
                                 initialMarkdown = readerMarkdown,
+                                sourceType = readerSourceType,
                                 playerState = recorderState,
                                 pauseAudioOnLeave = recorderState.pauseAudioOnLeave,
                                 onPlay = viewModel::playRecordingById,
@@ -351,6 +354,7 @@ class MainActivity : ComponentActivity() {
                                 onBack = {
                                     readerSession = null
                                     readerMarkdown = null
+                                    readerSourceType = ""
                                 },
                             )
                             "onboarding" -> OnboardingScreen(
