@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material.icons.filled.UploadFile
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
@@ -237,14 +238,32 @@ fun SettingsScreen(
                 )
             }
 
+            SettingsSection(title = "ПОДПИСКА") {
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Text(
+                        text = "Текущий тариф: ${usage?.planName ?: "Бесплатный"}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F172A),
+                    )
+                    Text(
+                        text = "Лимиты и доступные способы оплаты",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF64748B),
+                    )
+                    Button(
+                        onClick = onOpenPlans,
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    ) {
+                        Text(if (usage?.planId == "free" || usage == null) "Выбрать тариф" else "Улучшить тариф")
+                    }
+                }
+            }
+
             SettingsSection(title = "ЛИМИТЫ") {
-                SettingRow(
-                    icon = Icons.Filled.Info,
-                    title = "Тарифы и лимиты",
-                    subtitle = "Сравнить планы и возможности",
-                    onClick = onOpenPlans,
-                )
-                SettingDivider()
                 val current = usage
                 if (current == null) {
                     Text(
