@@ -256,6 +256,10 @@ fun SettingsScreen(
                 } else {
                     UsageRow("Запись", current.recordingUsedMinutes, current.recordingLimitMinutes, "мин")
                     UsageDivider()
+                    UsageRow("Документы", current.documentsUsed, current.documentsLimit, "")
+                    UsageDivider()
+                    StorageUsageRow(current.storageUsedBytes, current.storageLimitBytes)
+                    UsageDivider()
                     UsageRow("Вопросы сегодня", current.qaUsed, current.qaLimit, "")
                     UsageDivider()
                     UsageRow("Проверка сегодня", current.studyKitUsed, current.studyKitLimit, "")
@@ -499,6 +503,33 @@ private fun UsageRow(label: String, used: Int, limit: Int, unit: String) {
             trackColor = Color(0xFFE2E8F0),
         )
     }
+}
+
+@Composable
+private fun StorageUsageRow(usedBytes: Long, limitBytes: Long) {
+    val fraction = if (limitBytes > 0) (usedBytes.toFloat() / limitBytes.toFloat()).coerceIn(0f, 1f) else 0f
+    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            Text("Хранилище S3", style = MaterialTheme.typography.bodyMedium, color = Color(0xFF334155))
+            Text(
+                "${formatStorageBytes(usedBytes)} / ${formatStorageBytes(limitBytes)}",
+                style = MaterialTheme.typography.labelSmall,
+                color = Color(0xFF64748B),
+            )
+        }
+        LinearProgressIndicator(
+            progress = { fraction },
+            modifier = Modifier.fillMaxWidth().padding(top = 5.dp).height(4.dp),
+            color = if (fraction > 0.9f) Color(0xFFDC2626) else Color(0xFF4338CA),
+            trackColor = Color(0xFFE2E8F0),
+        )
+    }
+}
+
+private fun formatStorageBytes(bytes: Long): String {
+    if (bytes <= 0L) return "0 ГБ"
+    val gb = bytes / (1024.0 * 1024.0 * 1024.0)
+    return if (gb >= 1.0) String.format("%.1f ГБ", gb) else "${bytes / (1024 * 1024)} МБ"
 }
 
 @Composable
