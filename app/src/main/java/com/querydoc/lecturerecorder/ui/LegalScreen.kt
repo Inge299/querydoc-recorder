@@ -1,5 +1,8 @@
 package com.querydoc.lecturerecorder.ui
 
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -20,17 +23,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
+private const val SITE = "https://querydoc.ru"
+
 @Composable
 fun LegalScreen(onBack: () -> Unit) {
     BackHandler { onBack() }
+    val context = LocalContext.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -59,48 +67,71 @@ fun LegalScreen(onBack: () -> Unit) {
                 .padding(horizontal = 16.dp, vertical = 8.dp),
         ) {
             LegalCard(
-                title = "Статус документа",
-                text = "QueryDoc находится в стадии бета-теста. Реквизиты оператора персональных данных будут опубликованы после государственной регистрации организации. До этого сервис используется в ограниченном тестовом режиме.",
+                title = "Продавец",
+                text = """
+                    Ходыкина Ольга Александровна
+                    Плательщик налога на профессиональный доход (самозанятый)
+                    ИНН: 263214814373
+                    г. Пятигорск
+                """.trimIndent(),
             )
             LegalCard(
                 title = "Политика конфиденциальности",
                 text = """
-                    Мы обрабатываем номер телефона для входа, записи лекций, транскрипты, конспекты, историю использования и технические данные приложения.
+                    Мы обрабатываем номер телефона для входа, записи, транскрипты, конспекты, документы, историю использования и технические данные приложения.
 
-                    Аудио и текст передаются внешним поставщикам распознавания речи и языковых моделей для формирования конспекта и ответов. Мы не продаём персональные данные и не используем содержание лекций для рекламы.
+                    Аудио и текст передаются поставщикам распознавания речи и языковых моделей для формирования конспекта и ответов. Мы не продаём персональные данные и не используем содержание лекций для рекламы.
 
-                    Аудио хранится ограниченное время, заданное тарифом и настройками сервиса. Конспекты и транскрипты доступны в библиотеке, пока вы не удалите их или аккаунт.
+                    Аудио хранится ограниченное время, заданное тарифом. Конспекты и транскрипты доступны, пока вы не удалите их или аккаунт.
                 """.trimIndent(),
             )
             LegalCard(
                 title = "Согласие на обработку",
                 text = """
-                    Нажимая «Запись» или загружая аудио, вы соглашаетесь на обработку записи для расшифровки и подготовки конспекта.
+                    Используя запись или загрузку аудио, вы соглашаетесь на обработку записи для расшифровки и подготовки конспекта.
 
-                    Вы можете отозвать согласие, удалив конспект или аккаунт в настройках. Удаление аккаунта удаляет конспекты, аудио и связанные данные из сервиса.
+                    Вы можете отозвать согласие, удалив конспект или аккаунт. Удаление аккаунта удаляет конспекты, аудио и связанные данные из сервиса.
+
+                    Запись разговоров и лекций должна соответствовать закону и согласию участников.
                 """.trimIndent(),
             )
             LegalCard(
                 title = "Условия использования",
                 text = """
-                    Сервис предназначен для учебных целей. Конспекты и ответы генерируются автоматически и могут содержать ошибки: проверяйте важные факты по первоисточнику.
+                    Сервис предназначен для учебных и рабочих материалов. Конспекты и ответы генерируются автоматически и могут содержать ошибки: проверяйте важные факты по первоисточнику.
 
-                    Запрещено загружать материалы, на которые у вас нет прав, и использовать сервис для нарушения закона или прав других людей.
-
-                    Запись разговоров и лекций должна соответствовать применимому законодательству и согласию участников.
+                    Запрещено загружать материалы без прав и использовать сервис для нарушения закона или прав других людей.
                 """.trimIndent(),
             )
             LegalCard(
                 title = "Контакты",
-                text = "После регистрации организации здесь будут указаны юридическое название, ИНН/ОГРН, адрес и email для обращений по персональным данным.",
+                text = "Email: admin.RAGpro@gmail.com\nТелефон: +7 962 424-59-36\nСайт: https://querydoc.ru",
             )
+            TextButton(onClick = { openUrl(context, "$SITE/requisites") }) {
+                Text("Реквизиты на сайте")
+            }
+            TextButton(onClick = { openUrl(context, "$SITE/offer") }) {
+                Text("Публичная оферта")
+            }
+            TextButton(onClick = { openUrl(context, "$SITE/privacy") }) {
+                Text("Политика конфиденциальности")
+            }
+            TextButton(onClick = { openUrl(context, "$SITE/consent") }) {
+                Text("Согласие на обработку данных")
+            }
             Text(
-                "Редакция для бета-теста. Перед публичным запуском документы должны быть проверены юристом и дополнены реквизитами оператора.",
+                "Редакция от 09.11.2026. Актуальные документы всегда доступны на querydoc.ru.",
                 style = MaterialTheme.typography.labelSmall,
-                color = Color(0xFF92400E),
+                color = Color(0xFF64748B),
                 modifier = Modifier.padding(8.dp, 8.dp, 8.dp, 24.dp),
             )
         }
+    }
+}
+
+private fun openUrl(context: Context, url: String) {
+    runCatching {
+        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
     }
 }
 
