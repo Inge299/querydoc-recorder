@@ -174,7 +174,7 @@ fun SubjectsManagerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(subject.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                Text(displaySubjectName(subject.name), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
                                 Text(
                                     if (subject.count > 0) "${subject.count} конспектов" else "Нет конспектов",
                                     style = MaterialTheme.typography.labelSmall,
@@ -259,4 +259,11 @@ fun SubjectsManagerScreen(
             dismissButton = { TextButton(onClick = { deleting = null }) { Text("Отмена") } },
         )
     }
+}
+
+
+private fun displaySubjectName(value: String): String {
+    val trimmed = value.trim()
+    if (trimmed.isBlank()) return "Без предмета"
+    return trimmed.replaceFirstChar { char -> if (char.isLowerCase()) char.titlecase() else char.toString() }
 }

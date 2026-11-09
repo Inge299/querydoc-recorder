@@ -118,6 +118,11 @@ fun ConspectsScreen(
         when (val result = api.listConspects()) {
             is ApiResult.Ok -> {
                 items = result.value
+                val serverIds = items.map { it.sessionId }.toSet()
+                ConspectCache.list(context)
+                    .map { it.sessionId }
+                    .filterNot { it in serverIds }
+                    .forEach { ConspectCache.remove(context, it) }
                 cachedIds = ConspectCache.list(context).map { it.sessionId }.toSet()
                 offline = false
                 when (val subjectResult = api.listSubjects()) {
