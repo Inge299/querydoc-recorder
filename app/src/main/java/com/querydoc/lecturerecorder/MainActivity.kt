@@ -263,6 +263,7 @@ class MainActivity : ComponentActivity() {
                             onRequestConspect = viewModel::requestConspect,
                             onDismissConspect = viewModel::dismissConspect,
                             onOpenConspects = { showConspects = true },
+                            onOpenPlans = { showPlans = true },
                             onOpenSettings = { showSettings = true },
                             onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*", "application/pdf", "text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
                             onDismissImport = viewModel::clearImportState,
@@ -291,7 +292,6 @@ class MainActivity : ComponentActivity() {
                                 onSetEnvironmentProfile = viewModel::setEnvironmentProfile,
                                 onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
                                 onOpenLegal = { showLegal = true },
-                                onOpenPlans = { showPlans = true },
                                 onOpenNotifications = { showNotifications = true },
                                 onOpenSupport = { showSupport = true },
                                 onDeleteAccount = { password, callback ->

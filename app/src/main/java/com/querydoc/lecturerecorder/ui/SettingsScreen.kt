@@ -85,7 +85,6 @@ fun SettingsScreen(
     onSetRecognitionLanguage: (RecognitionLanguage) -> Unit,
     onLogout: () -> Unit,
     onOpenLegal: () -> Unit,
-    onOpenPlans: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenSupport: () -> Unit,
     onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
@@ -236,53 +235,6 @@ fun SettingsScreen(
                     onClick = { showLanguageDialog = true },
                     trailing = { Chevron() },
                 )
-            }
-
-            SettingsSection(title = "ПОДПИСКА") {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(
-                        text = "Текущий тариф: ${usage?.planName ?: "Бесплатный"}",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0F172A),
-                    )
-                    Text(
-                        text = "Лимиты и доступные способы оплаты",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF64748B),
-                    )
-                    Button(
-                        onClick = onOpenPlans,
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    ) {
-                        Text(if (usage?.planId == "free" || usage == null) "Выбрать тариф" else "Улучшить тариф")
-                    }
-                }
-            }
-
-            SettingsSection(title = "ЛИМИТЫ") {
-                val current = usage
-                if (current == null) {
-                    Text(
-                        if (usageError.isBlank()) "Загрузка…" else usageError,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF64748B),
-                        modifier = Modifier.padding(16.dp),
-                    )
-                } else {
-                    UsageRow("Запись", current.recordingUsedMinutes, current.recordingLimitMinutes + current.recordingBonusMinutes, "мин")
-                    UsageDivider()
-                    UsageRow("Документы", current.documentsUsed, current.documentsLimit, "")
-                    UsageDivider()
-                    StorageUsageRow(current.storageUsedBytes, current.storageLimitBytes)
-                    UsageDivider()
-                    UsageRow("Вопросы сегодня", current.qaUsed, current.qaLimit, "")
-                    UsageDivider()
-                    UsageRow("Проверка сегодня", current.studyKitUsed, current.studyKitLimit, "")
-                }
             }
 
             SettingsSection(title = "ДОКУМЕНТЫ") {

@@ -118,6 +118,7 @@ fun RecorderScreen(
     onRequestConspect: (String) -> Unit,
     onDismissConspect: () -> Unit,
     onOpenConspects: () -> Unit,
+    onOpenPlans: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImport: () -> Unit,
     onDismissImport: () -> Unit,
@@ -324,13 +325,46 @@ fun RecorderScreen(
                     trackColor = Color(0xFFE2E8F0),
                 )
                 Text(
-                    if (uiState.usageLoaded) {
-                        "Использовано $used из $limit мин в этом месяце" +
-                            if (bonusMinutes > 0) " · бонус +$bonusMinutes мин" else ""
-                    } else "Загрузка…",
+                    if (uiState.usageLoaded) "Использовано $used из $limit мин в этом месяце" else "Загрузка…",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF64748B),
                 )
+                if (uiState.usageLoaded && bonusMinutes > 0) {
+                    Text(
+                        "${uiState.recordingLimitMinutes} мин по тарифу + $bonusMinutes мин докуплено",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF64748B),
+                    )
+                }
+            }
+        }
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onOpenPlans),
+            shape = sectionShape,
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "Тариф, лимиты и докупка",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F172A),
+                    )
+                    Text(
+                        "Сменить тариф, посмотреть лимиты и купить часы",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF64748B),
+                    )
+                }
+                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFF64748B))
             }
         }
 
