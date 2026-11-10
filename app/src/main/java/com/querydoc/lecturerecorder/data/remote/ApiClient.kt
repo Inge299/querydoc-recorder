@@ -881,8 +881,8 @@ class ApiClient(context: Context) {
                     planId = item.optString("planId"),
                     amountRub = item.optInt("amountRub"),
                     status = item.optString("status"),
-                    paidAt = item.optString("paidAt").takeIf { it.isNotBlank() },
-                    createdAt = item.optString("createdAt").takeIf { it.isNotBlank() },
+                    paidAt = item.optString("paidAt").takeIf { it.isNotBlank() && it != "null" },
+                    createdAt = item.optString("createdAt").takeIf { it.isNotBlank() && it != "null" },
                     receiptStatus = item.optString("receiptStatus"),
                     receiptUrl = item.optString("receiptUrl"),
                 )

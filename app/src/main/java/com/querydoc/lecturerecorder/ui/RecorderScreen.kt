@@ -243,32 +243,36 @@ fun RecorderScreen(
                             overflow = TextOverflow.Ellipsis
                         )
                     }
-                    Row(verticalAlignment = Alignment.Top) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
                         NotificationBell(
                             unread = unreadNotifications,
                             onClick = onOpenNotifications,
                             tint = Color(0xFFDDEAFD),
+                            modifier = Modifier.size(40.dp),
                         )
                         IconButton(
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(40.dp),
                             onClick = onOpenPlans,
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.AccountBalanceWallet,
                                 contentDescription = "Тарифы и лимиты",
                                 tint = Color(0xFFDDEAFD),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(21.dp)
                             )
                         }
                         IconButton(
-                            modifier = Modifier.size(32.dp),
+                            modifier = Modifier.size(40.dp),
                             onClick = onOpenSettings,
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Settings,
                                 contentDescription = "Настройки",
                                 tint = Color(0xFFDDEAFD),
-                                modifier = Modifier.size(18.dp)
+                                modifier = Modifier.size(21.dp)
                             )
                         }
                     }

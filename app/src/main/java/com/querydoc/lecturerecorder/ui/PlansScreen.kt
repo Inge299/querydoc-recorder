@@ -131,8 +131,11 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                             Text("Тестовый режим: оплата без реальных денег", color = Color(0xFFFBBF24), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
                         }
                         payments.firstOrNull()?.let { latest ->
+                            val pending = latest.status != "succeeded"
                             Text(
-                                "Последняя операция: ${paymentLabel(latest)} · ${paymentDate(latest)} · ${paymentStatusLabel(latest.status)}",
+                                (if (pending) "Последняя попытка: " else "Последняя операция: ") +
+                                    "${paymentLabel(latest)} · ${paymentStatusLabel(latest.status)}" +
+                                    if (!pending) " · ${paymentDate(latest)}" else "",
                                 color = Color(0xFFC7D2FE),
                                 style = MaterialTheme.typography.labelSmall,
                                 modifier = Modifier.padding(top = 6.dp),
@@ -163,7 +166,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                     }
                 }
 
-                data.plans.forEach { plan ->
+                data.plans.sortedWith(compareBy({ it.id == "free" }, { it.priceMonthly })).forEach { plan ->
                     PlanCard(
                         plan = plan,
                         current = plan.id == data.currentPlanId,
@@ -278,18 +281,23 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
 private fun paymentLabel(payment: PaymentHistoryItem): String {
     if (payment.planId == "topup_5h") return "Пакет +5 часов"
     if (payment.amountRub == 0) return "Тестовая активация"
+    if (payment.planId == "student") return "Тариф Студенческий"
+    if (payment.planId == "free") return "Бесплатный тариф"
     return "Оплата тарифа ${payment.planId}"
 }
 
 private fun paymentStatusLabel(status: String): String = when (status) {
     "succeeded" -> "успешно"
-    "pending" -> "ожидает"
+    "pending" -> "ожидает оплаты"
     "canceled", "failed" -> "ошибка"
     else -> status
 }
 
 private fun paymentDate(payment: PaymentHistoryItem): String =
-    (payment.paidAt ?: payment.createdAt)?.take(10) ?: "дата уточняется"
+    (payment.paidAt ?: payment.createdAt)
+        ?.takeIf { it != "null" && it.isNotBlank() }
+        ?.take(10)
+        ?: "дата уточняется"
 
 @Composable
 private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, billingReady: Boolean, busy: Boolean, period: String, onBuy: () -> Unit) {

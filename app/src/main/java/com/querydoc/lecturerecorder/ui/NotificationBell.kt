@@ -2,6 +2,7 @@ package com.querydoc.lecturerecorder.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -22,9 +23,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun NotificationBell(unread: Int, onClick: () -> Unit, tint: Color = Color(0xFF4338CA)) {
-    Box {
-        IconButton(onClick = onClick) {
+fun NotificationBell(unread: Int, onClick: () -> Unit, tint: Color = Color(0xFF4338CA), modifier: Modifier = Modifier) {
+    Box(modifier = modifier) {
+        IconButton(onClick = onClick, modifier = Modifier.fillMaxSize()) {
             Icon(Icons.Filled.Notifications, contentDescription = "Уведомления", tint = tint)
         }
         if (unread > 0) {
