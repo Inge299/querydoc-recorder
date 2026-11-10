@@ -155,7 +155,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    listOf("month" to "Месяц", "semester" to "Семестр", "year" to "Год").forEach { (value, label) ->
+                    listOf("month" to "Месяц", "semester" to "4 месяца", "year" to "Год").forEach { (value, label) ->
                         androidx.compose.material3.OutlinedButton(
                             onClick = { billingPeriod = value },
                             modifier = Modifier.weight(1f),
@@ -310,7 +310,7 @@ private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, bil
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(plan.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
                 val price = when (period) { "year" -> plan.priceAnnual; "semester" -> plan.priceSemester; else -> plan.priceMonthly }
-                val suffix = when (period) { "year" -> "год"; "semester" -> "семестр"; else -> "мес" }
+                val suffix = when (period) { "year" -> "год"; "semester" -> "4 месяца"; else -> "мес" }
                 Text(if (price == 0) "Бесплатно" else "$price ₽/$suffix", fontWeight = FontWeight.Bold, color = Color(0xFF4338CA))
             }
             Text(
@@ -327,7 +327,7 @@ private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, bil
                     current -> "Текущий тариф"
                     busy -> "Активируем…"
                     testBilling -> "Активировать тестовый тариф"
-                    billingReady -> when (period) { "year" -> "Оплатить год"; "semester" -> "Оплатить семестр"; else -> "Оплатить месяц" }
+                    billingReady -> when (period) { "year" -> "Оплатить год"; "semester" -> "Оплатить 4 месяца"; else -> "Оплатить месяц" }
                     else -> "Оплата скоро"
                 })
             }
