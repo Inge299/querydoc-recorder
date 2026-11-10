@@ -273,7 +273,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(16.dp),
                     )
                 } else {
-                    UsageRow("Запись", current.recordingUsedMinutes, current.recordingLimitMinutes, "мин")
+                    UsageRow("Запись", current.recordingUsedMinutes, current.recordingLimitMinutes + current.recordingBonusMinutes, "мин")
                     UsageDivider()
                     UsageRow("Документы", current.documentsUsed, current.documentsLimit, "")
                     UsageDivider()

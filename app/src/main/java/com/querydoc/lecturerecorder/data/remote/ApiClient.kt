@@ -110,6 +110,7 @@ data class AuthChallenge(
 data class UsageSummary(
     val recordingUsedMinutes: Int,
     val recordingLimitMinutes: Int,
+    val recordingBonusMinutes: Int = 0,
     val recordingRemainingMinutes: Int,
     val qaUsed: Int,
     val qaLimit: Int,
@@ -758,6 +759,7 @@ class ApiClient(context: Context) {
                 UsageSummary(
                     recordingUsedMinutes = recording?.optInt("usedMinutes") ?: 0,
                     recordingLimitMinutes = recording?.optInt("limitMinutes") ?: 180,
+                    recordingBonusMinutes = recording?.optInt("bonusMinutes") ?: 0,
                     recordingRemainingMinutes = recording?.optInt("remainingMinutes") ?: 0,
                     qaUsed = qa?.optInt("used") ?: 0,
                     qaLimit = qa?.optInt("limit") ?: 10,

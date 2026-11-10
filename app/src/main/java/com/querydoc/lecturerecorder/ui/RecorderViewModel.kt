@@ -881,6 +881,7 @@ class RecorderViewModel(
 
     fun onAppForeground() {
         appForeground = true
+        refreshUsage()
         if (!state.value.isRecording || state.value.isRecordingPaused) startIdleMicIfAllowed()
     }
 
@@ -906,6 +907,7 @@ class RecorderViewModel(
                     it.copy(
                         recordingUsedMinutes = result.value.recordingUsedMinutes,
                         recordingLimitMinutes = result.value.recordingLimitMinutes,
+                        recordingBonusMinutes = result.value.recordingBonusMinutes,
                         recordingRemainingMinutes = result.value.recordingRemainingMinutes,
                         storageDays = allowedDays,
                         audioRetentionDays = if (it.audioRetentionDays > allowedDays) allowedDays else it.audioRetentionDays,

@@ -308,7 +308,8 @@ fun RecorderScreen(
         }
 
         Card(shape = sectionShape, modifier = Modifier.fillMaxWidth()) {
-            val limit = uiState.recordingLimitMinutes.coerceAtLeast(1)
+            val bonusMinutes = uiState.recordingBonusMinutes.coerceAtLeast(0)
+            val limit = (uiState.recordingLimitMinutes + bonusMinutes).coerceAtLeast(1)
             val used = uiState.recordingUsedMinutes.coerceIn(0, limit)
             val fraction = (used.toFloat() / limit.toFloat()).coerceIn(0f, 1f)
             Column(
@@ -323,7 +324,10 @@ fun RecorderScreen(
                     trackColor = Color(0xFFE2E8F0),
                 )
                 Text(
-                    if (uiState.usageLoaded) "Использовано $used из ${uiState.recordingLimitMinutes} мин в этом месяце" else "Загрузка…",
+                    if (uiState.usageLoaded) {
+                        "Использовано $used из $limit мин в этом месяце" +
+                            if (bonusMinutes > 0) " · бонус +$bonusMinutes мин" else ""
+                    } else "Загрузка…",
                     style = MaterialTheme.typography.labelSmall,
                     color = Color(0xFF64748B),
                 )

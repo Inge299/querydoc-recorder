@@ -21,6 +21,7 @@ data class RecorderUiState(
     val remainingRecordSeconds: Long = 0L,
     val recordingUsedMinutes: Int = 0,
     val recordingLimitMinutes: Int = 180,
+    val recordingBonusMinutes: Int = 0,
     val recordingRemainingMinutes: Int = 180,
     val usageLoaded: Boolean = false,
     val paywallRequested: Boolean = false,
