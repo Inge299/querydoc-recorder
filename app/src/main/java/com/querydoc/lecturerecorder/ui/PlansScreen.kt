@@ -317,7 +317,7 @@ private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, bil
                 Text(if (price == 0) "Бесплатно" else "$price ₽/$suffix", fontWeight = FontWeight.Bold, color = Color(0xFF4338CA))
             }
             Text(
-                "${formatMonthlyMinutes(plan.monthlyRecordingMinutes)} записей · ${plan.dailyQa} вопросов/день · хранение ${plan.storageDays} дн.${if (plan.id == "free") " (в бете может дольше)" else ""}",
+                "${formatMonthlyMinutes(plan.monthlyRecordingMinutes)} записей · ${plan.dailyQa} вопросов/день · хранение ${plan.storageDays} дн.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF64748B),
             )

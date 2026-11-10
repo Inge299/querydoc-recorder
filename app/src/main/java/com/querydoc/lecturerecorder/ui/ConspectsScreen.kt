@@ -284,6 +284,7 @@ fun ConspectsScreen(
                             ConspectRow(
                                 item = item,
                                 hasLocalCopy = item.sessionId in cachedIds,
+                                hasUnread = item.sessionId !in seenSessionIds,
                                 onClick = {
                                     seenSessionIds = seenSessionIds + item.sessionId
                                     conspectPrefs.edit()
@@ -552,6 +553,7 @@ private fun SubjectHeader(subject: String, count: Int, hasUnread: Boolean, lastL
 private fun ConspectRow(
     item: ConspectSummary,
     hasLocalCopy: Boolean,
+    hasUnread: Boolean,
     onClick: () -> Unit,
     onRemoveLocal: () -> Unit,
     onDeleteRemote: () -> Unit,
@@ -593,6 +595,14 @@ private fun ConspectRow(
                         letterSpacing = 0.8.sp,
                         maxLines = 1,
                     )
+                    if (hasUnread) {
+                        Box(
+                            modifier = Modifier
+                                .padding(start = 6.dp)
+                                .size(7.dp)
+                                .background(Color(0xFF4338CA), CircleShape),
+                        )
+                    }
                     Spacer(Modifier.weight(1f))
                     if (item.completedAt.isNotBlank()) {
                         Text(
