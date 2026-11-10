@@ -85,8 +85,6 @@ fun ConspectsScreen(
     onDeleteLocalPackage: (String) -> Unit,
     onBack: () -> Unit,
     onOpen: (ConspectSummary) -> Unit,
-    unreadNotifications: Int,
-    onOpenNotifications: () -> Unit,
 ) {
     val context = LocalContext.current
     var loading by remember { mutableStateOf(true) }
@@ -162,7 +160,6 @@ fun ConspectsScreen(
                 color = Color(0xFF0F172A),
                 modifier = Modifier.weight(1f),
             )
-            NotificationBell(unread = unreadNotifications, onClick = onOpenNotifications)
             IconButton(onClick = { showSubjectsManager = true }) {
                 Icon(Icons.Filled.Category, contentDescription = "Предметы", tint = Color(0xFF4338CA))
             }

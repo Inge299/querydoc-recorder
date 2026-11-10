@@ -337,8 +337,6 @@ class MainActivity : ComponentActivity() {
                                     readerSourceType = summary.sourceType
                                     readerSession = summary.sessionId
                                 },
-                                unreadNotifications = unreadNotifications,
-                                onOpenNotifications = { showNotifications = true },
                             )
                             "reader" -> ConspectReaderScreen(
                                 api = api,
