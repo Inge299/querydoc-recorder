@@ -266,7 +266,8 @@ class RecorderViewModel(
     }
 
     fun setMaxRecordingMinutes(minutes: Int) {
-        RecordingLimitStore.set(app, minutes)
+        val allowed = state.value.maxSessionMinutes.coerceAtLeast(30)
+        RecordingLimitStore.set(app, minutes.coerceAtMost(allowed))
         warnedSecondsLeft = null
         _state.update { it.copy(maxRecordingMinutes = RecordingLimitStore.current(app)) }
     }
@@ -904,10 +905,15 @@ class RecorderViewModel(
                     if (it.audioRetentionDays > allowedDays) {
                         AudioStorageStore.setRetentionDays(app, allowedDays)
                     }
+                    val allowedMax = result.value.maxSessionMinutes.coerceAtLeast(30)
+                    val effectiveMax = it.maxRecordingMinutes.coerceAtMost(allowedMax)
+                    if (effectiveMax != it.maxRecordingMinutes) RecordingLimitStore.set(app, effectiveMax)
                     it.copy(
                         recordingUsedMinutes = result.value.recordingUsedMinutes,
                         recordingLimitMinutes = result.value.recordingLimitMinutes,
                         recordingBonusMinutes = result.value.recordingBonusMinutes,
+                        maxSessionMinutes = allowedMax,
+                        maxRecordingMinutes = effectiveMax,
                         recordingRemainingMinutes = result.value.recordingRemainingMinutes,
                         storageDays = allowedDays,
                         audioRetentionDays = if (it.audioRetentionDays > allowedDays) allowedDays else it.audioRetentionDays,

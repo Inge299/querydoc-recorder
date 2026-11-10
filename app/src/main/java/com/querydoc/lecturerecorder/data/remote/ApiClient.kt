@@ -111,6 +111,7 @@ data class UsageSummary(
     val recordingUsedMinutes: Int,
     val recordingLimitMinutes: Int,
     val recordingBonusMinutes: Int = 0,
+    val maxSessionMinutes: Int = 90,
     val recordingRemainingMinutes: Int,
     val qaUsed: Int,
     val qaLimit: Int,
@@ -759,8 +760,9 @@ class ApiClient(context: Context) {
             ApiResult.Ok(
                 UsageSummary(
                     recordingUsedMinutes = recording?.optInt("usedMinutes") ?: 0,
-                    recordingLimitMinutes = recording?.optInt("limitMinutes") ?: 180,
+                    recordingLimitMinutes = recording?.optInt("limitMinutes") ?: 90,
                     recordingBonusMinutes = recording?.optInt("bonusMinutes") ?: 0,
+                    maxSessionMinutes = json.optJSONObject("limits")?.optInt("maxSessionMinutes") ?: 90,
                     recordingRemainingMinutes = recording?.optInt("remainingMinutes") ?: 0,
                     qaUsed = qa?.optInt("used") ?: 0,
                     qaLimit = qa?.optInt("limit") ?: 10,
