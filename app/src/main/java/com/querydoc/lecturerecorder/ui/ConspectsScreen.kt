@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -100,6 +101,9 @@ fun ConspectsScreen(
     var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
     val conspectPrefs = remember { context.getSharedPreferences("conspect_prefs", android.content.Context.MODE_PRIVATE) }
     var sortByName by remember { mutableStateOf(conspectPrefs.getBoolean("sort_by_name", false)) }
+    var seenSessionIds by remember {
+        mutableStateOf(conspectPrefs.getStringSet("seen_session_ids", emptySet())?.toSet() ?: emptySet())
+    }
     val scope = rememberCoroutineScope()
 
     if (showSubjectsManager) {
@@ -263,6 +267,7 @@ fun ConspectsScreen(
                             SubjectHeader(
                                 subject = subject,
                                 count = rows.size,
+                                hasUnread = rows.any { it.sessionId !in seenSessionIds },
                                 lastLectureDate = rows.maxOfOrNull { it.completedAt }?.let { formatSubjectDate(it) }.orEmpty(),
                                 expanded = subject in expandedSubjects,
                                 onToggle = {
@@ -279,7 +284,13 @@ fun ConspectsScreen(
                             ConspectRow(
                                 item = item,
                                 hasLocalCopy = item.sessionId in cachedIds,
-                                onClick = { onOpen(item) },
+                                onClick = {
+                                    seenSessionIds = seenSessionIds + item.sessionId
+                                    conspectPrefs.edit()
+                                        .putStringSet("seen_session_ids", seenSessionIds)
+                                        .apply()
+                                    onOpen(item)
+                                },
                                 onRemoveLocal = {
                                     onDeleteLocalPackage(item.sessionId)
                                     cachedIds = cachedIds - item.sessionId
@@ -475,7 +486,7 @@ private fun formatSubjectDate(value: String): String {
 }
 
 @Composable
-private fun SubjectHeader(subject: String, count: Int, lastLectureDate: String, expanded: Boolean, onToggle: () -> Unit) {
+private fun SubjectHeader(subject: String, count: Int, hasUnread: Boolean, lastLectureDate: String, expanded: Boolean, onToggle: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -498,14 +509,24 @@ private fun SubjectHeader(subject: String, count: Int, lastLectureDate: String, 
                 Icon(Icons.Filled.Folder, contentDescription = null, tint = Color(0xFF4338CA), modifier = Modifier.size(19.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    subject,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF1E1B4B),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        subject,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF1E1B4B),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (hasUnread) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(Color(0xFF4338CA), CircleShape),
+                        )
+                    }
+                }
                 Text(
                     buildString {
                         append("$count ${conspectWord(count)}")

@@ -278,6 +278,9 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
     }
 }
 
+private fun formatMonthlyMinutes(minutes: Int): String =
+    if (minutes > 0 && minutes % 60 == 0) "${minutes / 60} ч" else "$minutes мин"
+
 private fun paymentLabel(payment: PaymentHistoryItem): String {
     if (payment.planId == "topup_5h") return "Пакет +5 часов"
     if (payment.amountRub == 0) return "Тестовая активация"
@@ -314,7 +317,7 @@ private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, bil
                 Text(if (price == 0) "Бесплатно" else "$price ₽/$suffix", fontWeight = FontWeight.Bold, color = Color(0xFF4338CA))
             }
             Text(
-                "${plan.monthlyRecordingMinutes / 60} ч записей · ${plan.dailyQa} вопросов/день · хранение ${plan.storageDays} дн.${if (plan.id == "free") " (в бете может дольше)" else ""}",
+                "${formatMonthlyMinutes(plan.monthlyRecordingMinutes)} записей · ${plan.dailyQa} вопросов/день · хранение ${plan.storageDays} дн.${if (plan.id == "free") " (в бете может дольше)" else ""}",
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF64748B),
             )
