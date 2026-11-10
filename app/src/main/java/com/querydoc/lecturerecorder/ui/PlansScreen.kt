@@ -25,6 +25,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +58,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
     var buyingId by remember { mutableStateOf("") }
     var buyingTopUp by remember { mutableStateOf(false) }
     var billingPeriod by remember { mutableStateOf("month") }
+    var historyExpanded by remember { mutableStateOf(false) }
 
     suspend fun reload() {
         loading = true
@@ -110,48 +112,12 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(
-                "Лимиты применяются на сервере. После оплаты они обновятся в приложении.",
-                style = MaterialTheme.typography.bodySmall,
-                color = Color(0xFF64748B),
-            )
             if (loading) {
                 CircularProgressIndicator(color = Color(0xFF4338CA), modifier = Modifier.padding(24.dp))
             }
             if (error.isNotBlank()) {
                 Text(error, color = Color(0xFFB91C1C), style = MaterialTheme.typography.bodySmall)
             }
-            if (payments.isNotEmpty()) {
-                Text("История платежей", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 8.dp))
-                payments.forEach { payment ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(
-                                if (payment.amountRub == 0) "Тестовая активация" else "Оплата ${payment.amountRub} ₽",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                payment.paidAt?.take(10) ?: "Дата уточняется",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFF64748B),
-                            )
-                            if (payment.receiptUrl.isNotBlank()) {
-                                androidx.compose.material3.TextButton(onClick = {
-                                    runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(payment.receiptUrl))) }
-                                }) { Text("Открыть чек") }
-                            } else if (payment.receiptStatus == "pending") {
-                                Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
-                            }
-                        }
-                    }
-                }
-            }
-
             payload?.let { data ->
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -164,47 +130,23 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         if (data.testBilling) {
                             Text("Тестовый режим: оплата без реальных денег", color = Color(0xFFFBBF24), style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 6.dp))
                         }
-                        Text(
-                            "После оплаты вернитесь в приложение и обновите тарифы",
-                            color = Color(0xFF9CA3AF),
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(top = 6.dp),
-                        )
-                    }
-                }
-                data.topUp?.let { topUp ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(18.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                    ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(topUp.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
-                            Text("+${topUp.minutes} минут записи · ${topUp.priceRub} ₽", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-                            Text("Пакет действует в текущем месяце. Не включает автопродление.", style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
-                            Button(
-                                onClick = {
-                                    if (!data.billingReady) return@Button
-                                    buyingTopUp = true
-                                    scope.launch {
-                                        when (val result = api.createTopUp()) {
-                                            is ApiResult.Ok -> {
-                                                Toast.makeText(context, "Открываем оплату пакета", Toast.LENGTH_LONG).show()
-                                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.value))) }
-                                            }
-                                            is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
-                                        }
-                                        buyingTopUp = false
-                                    }
-                                },
-                                enabled = data.billingReady && !buyingTopUp,
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                            ) {
-                                Text(if (buyingTopUp) "Создаём платёж…" else if (data.billingReady) "Докупить 5 часов" else "Оплата скоро")
-                            }
+                        payments.firstOrNull()?.let { latest ->
+                            Text(
+                                "Последняя операция: ${paymentLabel(latest)} · ${paymentDate(latest)} · ${paymentStatusLabel(latest.status)}",
+                                color = Color(0xFFC7D2FE),
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
                         }
                     }
                 }
+                Text(
+                    "Период Student",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF0F172A),
+                    modifier = Modifier.padding(top = 6.dp),
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -257,10 +199,97 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         },
                     )
                 }
+
+                data.topUp?.let { topUp ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            Text(topUp.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
+                            Text("+${topUp.minutes} минут записи · ${topUp.priceRub} ₽", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                            Text("Пакет действует в текущем месяце. Не включает автопродление.", style = MaterialTheme.typography.labelSmall, color = Color(0xFF94A3B8))
+                            Button(
+                                onClick = {
+                                    if (!data.billingReady) return@Button
+                                    buyingTopUp = true
+                                    scope.launch {
+                                        when (val result = api.createTopUp()) {
+                                            is ApiResult.Ok -> {
+                                                Toast.makeText(context, "Открываем оплату пакета", Toast.LENGTH_LONG).show()
+                                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(result.value))) }
+                                            }
+                                            is ApiResult.Failure -> Toast.makeText(context, result.message, Toast.LENGTH_LONG).show()
+                                        }
+                                        buyingTopUp = false
+                                    }
+                                },
+                                enabled = data.billingReady && !buyingTopUp,
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                            ) {
+                                Text(if (buyingTopUp) "Создаём платёж…" else if (data.billingReady) "Докупить 5 часов" else "Оплата скоро")
+                            }
+                        }
+                    }
+                }
+
+
+                if (payments.isNotEmpty()) {
+                    TextButton(
+                        onClick = { historyExpanded = !historyExpanded },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    ) {
+                        Text(
+                            if (historyExpanded) "Скрыть историю платежей" else "История платежей (${payments.size})",
+                            color = Color(0xFF4338CA),
+                        )
+                    }
+                    if (historyExpanded) {
+                        payments.forEach { payment ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(paymentLabel(payment), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                        Text(paymentStatusLabel(payment.status), style = MaterialTheme.typography.labelSmall, color = if (payment.status == "succeeded") Color(0xFF15803D) else Color(0xFFB45309))
+                                    }
+                                    Text("${paymentDate(payment)} · ${payment.amountRub} ₽", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                                    if (payment.receiptUrl.isNotBlank()) {
+                                        TextButton(onClick = {
+                                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(payment.receiptUrl))) }
+                                        }) { Text("Открыть чек") }
+                                    } else if (payment.receiptStatus == "pending") {
+                                        Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+private fun paymentLabel(payment: PaymentHistoryItem): String {
+    if (payment.planId == "topup_5h") return "Пакет +5 часов"
+    if (payment.amountRub == 0) return "Тестовая активация"
+    return "Оплата тарифа ${payment.planId}"
+}
+
+private fun paymentStatusLabel(status: String): String = when (status) {
+    "succeeded" -> "успешно"
+    "pending" -> "ожидает"
+    "canceled", "failed" -> "ошибка"
+    else -> status
+}
+
+private fun paymentDate(payment: PaymentHistoryItem): String =
+    (payment.paidAt ?: payment.createdAt)?.take(10) ?: "дата уточняется"
 
 @Composable
 private fun PlanCard(plan: PlanInfo, current: Boolean, testBilling: Boolean, billingReady: Boolean, busy: Boolean, period: String, onBuy: () -> Unit) {

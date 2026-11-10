@@ -85,6 +85,7 @@ fun SettingsScreen(
     onSetRecognitionLanguage: (RecognitionLanguage) -> Unit,
     onLogout: () -> Unit,
     onOpenLegal: () -> Unit,
+    onOpenPlans: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenSupport: () -> Unit,
     onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
@@ -234,6 +235,15 @@ fun SettingsScreen(
                     subtitle = recognitionLanguage.label,
                     onClick = { showLanguageDialog = true },
                     trailing = { Chevron() },
+                )
+            }
+
+            SettingsSection(title = "ПОДПИСКА") {
+                SettingRow(
+                    icon = Icons.Filled.Info,
+                    title = "Тарифы и лимиты",
+                    subtitle = "Сменить тариф, докупить часы",
+                    onClick = onOpenPlans,
                 )
             }
 

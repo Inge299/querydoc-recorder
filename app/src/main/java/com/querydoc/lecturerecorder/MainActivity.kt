@@ -292,6 +292,7 @@ class MainActivity : ComponentActivity() {
                                 onSetEnvironmentProfile = viewModel::setEnvironmentProfile,
                                 onSetRecognitionLanguage = viewModel::setRecognitionLanguage,
                                 onOpenLegal = { showLegal = true },
+                                onOpenPlans = { showPlans = true },
                                 onOpenNotifications = { showNotifications = true },
                                 onOpenSupport = { showSupport = true },
                                 onDeleteAccount = { password, callback ->

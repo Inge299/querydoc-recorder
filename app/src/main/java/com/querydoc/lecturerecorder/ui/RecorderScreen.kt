@@ -34,6 +34,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDone
@@ -250,6 +251,17 @@ fun RecorderScreen(
                         )
                         IconButton(
                             modifier = Modifier.size(32.dp),
+                            onClick = onOpenPlans,
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AccountBalanceWallet,
+                                contentDescription = "Тарифы и лимиты",
+                                tint = Color(0xFFDDEAFD),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                        IconButton(
+                            modifier = Modifier.size(32.dp),
                             onClick = onOpenSettings,
                         ) {
                             Icon(
@@ -331,40 +343,11 @@ fun RecorderScreen(
                 )
                 if (uiState.usageLoaded && bonusMinutes > 0) {
                     Text(
-                        "${uiState.recordingLimitMinutes} мин по тарифу + $bonusMinutes мин докуплено",
+                        "${uiState.recordingLimitMinutes} мин по тарифу + $bonusMinutes мин",
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF64748B),
                     )
                 }
-            }
-        }
-
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onOpenPlans),
-            shape = sectionShape,
-            colors = CardDefaults.cardColors(containerColor = Color.White),
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        "Тариф, лимиты и докупка",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0F172A),
-                    )
-                    Text(
-                        "Сменить тариф, посмотреть лимиты и купить часы",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF64748B),
-                    )
-                }
-                Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFF64748B))
             }
         }
 

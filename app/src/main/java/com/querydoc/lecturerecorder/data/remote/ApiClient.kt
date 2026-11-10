@@ -197,6 +197,7 @@ data class PaymentHistoryItem(
     val amountRub: Int,
     val status: String,
     val paidAt: String?,
+    val createdAt: String?,
     val receiptStatus: String,
     val receiptUrl: String,
 )
@@ -881,6 +882,7 @@ class ApiClient(context: Context) {
                     amountRub = item.optInt("amountRub"),
                     status = item.optString("status"),
                     paidAt = item.optString("paidAt").takeIf { it.isNotBlank() },
+                    createdAt = item.optString("createdAt").takeIf { it.isNotBlank() },
                     receiptStatus = item.optString("receiptStatus"),
                     receiptUrl = item.optString("receiptUrl"),
                 )
