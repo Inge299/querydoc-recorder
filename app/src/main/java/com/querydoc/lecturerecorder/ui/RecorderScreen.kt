@@ -91,6 +91,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import java.time.Instant
+import java.time.ZoneId
 import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.querydoc.lecturerecorder.config.AppConfig
@@ -394,15 +395,14 @@ fun RecorderScreen(
                     accent = Color(0xFF334155),
                     onClick = onStopRecording,
                 )
+                ControlButton(
+                    icon = Icons.Filled.UploadFile,
+                    label = "Импорт",
+                    enabled = !uiState.isRecording,
+                    accent = Color(0xFF4338CA),
+                    onClick = onOpenImport,
+                )
             }
-        }
-
-        TextButton(
-            onClick = onOpenImport,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Icon(Icons.Filled.UploadFile, contentDescription = null, modifier = Modifier.size(18.dp))
-            Text("Импорт лекции из файла", modifier = Modifier.padding(start = 6.dp), style = MaterialTheme.typography.labelLarge)
         }
 
         Card(
@@ -506,7 +506,7 @@ fun RecorderScreen(
                     )
                 }
 
-                val visibleRecordings = uiState.recordings.filterNot { it.stage == RecordingStage.RECOGNIZED }
+                val visibleRecordings = uiState.recordings
                 if (visibleRecordings.isEmpty()) {
                     Column(
                         modifier = Modifier.fillMaxSize(),
@@ -514,28 +514,22 @@ fun RecorderScreen(
                         verticalArrangement = Arrangement.Center,
                     ) {
                         Text(
-                            text = if (uiState.recordings.isEmpty()) "Пока нет записей" else "Все лекции уже в Конспектах",
+                            text = "Пока нет записей",
                             style = MaterialTheme.typography.titleSmall,
                             color = Color(0xFF334155),
                         )
                         Text(
-                            text = if (uiState.recordings.isEmpty()) "Нажмите «Запись», чтобы начать" else "Готовые лекции, транскрипты и аудио — в библиотеке",
+                            text = "Нажмите «Запись» или «Импорт», чтобы начать",
                             style = MaterialTheme.typography.bodySmall,
                             color = Color(0xFF64748B),
                             modifier = Modifier.padding(top = 4.dp),
                         )
-                        if (uiState.recordings.isNotEmpty()) {
-                            TextButton(onClick = onOpenConspects, modifier = Modifier.padding(top = 8.dp)) {
-                                Text("Открыть Конспекты")
-                            }
-                        }
                     }
                 } else {
                     val listTapInteraction = remember { MutableInteractionSource() }
-                    val stageGroups = RecordingStage.entries
-                        .map { stage -> stage to visibleRecordings.filter { it.stage == stage } }
+                    val dateGroups = HistoryBucket.entries
+                        .map { bucket -> bucket to visibleRecordings.filter { historyBucket(it.createdAtMs) == bucket } }
                         .filter { it.second.isNotEmpty() }
-                        .sortedByDescending { group -> group.second.maxOfOrNull { it.createdAtMs } ?: 0L }
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -550,9 +544,9 @@ fun RecorderScreen(
                         state = listState,
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        stageGroups.forEach { (stage, rows) ->
-                            item(key = "stage_${stage.name}") {
-                                HistoryStageHeader(stage = stage, count = rows.size)
+                        dateGroups.forEach { (bucket, rows) ->
+                            item(key = "date_${bucket.name}") {
+                                HistoryDateHeader(bucket = bucket, count = rows.size)
                             }
                             items(rows, key = { it.id }) { item ->
                             val isCurrent = item.id == uiState.currentPlaybackItemId
@@ -628,14 +622,28 @@ fun RecorderScreen(
     }
 }
 
-@Composable
-private fun HistoryStageHeader(stage: RecordingStage, count: Int) {
-    val color = when (stage) {
-        RecordingStage.LOCAL -> Color(0xFFF59E0B)
-        RecordingStage.CLOUD -> Color(0xFF0284C7)
-        RecordingStage.RECOGNIZED -> Color(0xFF16A34A)
-        RecordingStage.FAILED -> Color(0xFFDC2626)
+private enum class HistoryBucket(val label: String) {
+    TODAY("Сегодня"),
+    YESTERDAY("Вчера"),
+    THIS_WEEK("На этой неделе"),
+    EARLIER("Ранее"),
+}
+
+private fun historyBucket(createdAtMs: Long): HistoryBucket {
+    val zone = ZoneId.systemDefault()
+    val date = Instant.ofEpochMilli(createdAtMs.coerceAtLeast(0L)).atZone(zone).toLocalDate()
+    val today = java.time.LocalDate.now(zone)
+    val days = java.time.temporal.ChronoUnit.DAYS.between(date, today)
+    return when {
+        days <= 0L -> HistoryBucket.TODAY
+        days == 1L -> HistoryBucket.YESTERDAY
+        days <= 7L -> HistoryBucket.THIS_WEEK
+        else -> HistoryBucket.EARLIER
     }
+}
+
+@Composable
+private fun HistoryDateHeader(bucket: HistoryBucket, count: Int) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -643,13 +651,12 @@ private fun HistoryStageHeader(stage: RecordingStage, count: Int) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Box(modifier = Modifier.size(7.dp).background(color, CircleShape))
+        Box(modifier = Modifier.size(6.dp).background(Color(0xFF818CF8), CircleShape))
         Text(
-            text = stage.label.uppercase(),
+            text = bucket.label,
             style = MaterialTheme.typography.labelSmall,
             color = Color(0xFF64748B),
             fontWeight = FontWeight.SemiBold,
-            letterSpacing = 0.7.sp,
         )
         Text(
             text = count.toString(),
@@ -720,7 +727,7 @@ private fun RecordingItemRow(
         border = androidx.compose.foundation.BorderStroke(1.dp, if (isSelected) Color(0xFF93C5FD) else Color(0xFFE8ECF3)),
     ) {
         Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
             verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Row(
@@ -742,7 +749,8 @@ private fun RecordingItemRow(
                         style = MaterialTheme.typography.labelSmall,
                         color = hintColor(item),
                         fontWeight = FontWeight.Medium,
-                        maxLines = 1,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
                 Text(
@@ -759,7 +767,7 @@ private fun RecordingItemRow(
                 item.uploadedChunks.toFloat() / item.totalChunks.toFloat()
             } else 0f
             when {
-                item.uploadedChunks < item.totalChunks && item.status != UploadStatus.FAILED -> {
+                item.uploadedChunks < item.totalChunks && item.status != UploadStatus.FAILED && item.status != UploadStatus.REJECTED -> {
                     LinearProgressIndicator(
                         progress = { uploadFraction.coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth().padding(top = 3.dp),
@@ -976,7 +984,7 @@ private fun StatusBadge(status: UploadStatus, stage: RecordingStage) {
     }
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(36.dp)
             .background(color.copy(alpha = 0.14f), CircleShape)
             .border(1.dp, color.copy(alpha = 0.30f), CircleShape),
         contentAlignment = Alignment.Center,
@@ -985,7 +993,7 @@ private fun StatusBadge(status: UploadStatus, stage: RecordingStage) {
             imageVector = icon,
             contentDescription = "Статус: ${stage.label}",
             tint = color,
-            modifier = Modifier.size(23.dp),
+            modifier = Modifier.size(19.dp),
         )
     }
 }
