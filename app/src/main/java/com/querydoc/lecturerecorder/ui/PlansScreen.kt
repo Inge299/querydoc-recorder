@@ -143,6 +143,42 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         }
                     }
                 }
+                if (payments.isNotEmpty()) {
+                    TextButton(
+                        onClick = { historyExpanded = !historyExpanded },
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    ) {
+                        Text(
+                            if (historyExpanded) "Скрыть историю платежей" else "История платежей и чеки (${payments.size})",
+                            color = Color(0xFF4338CA),
+                        )
+                    }
+                    if (historyExpanded) {
+                        payments.forEach { payment ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(14.dp),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text(paymentLabel(payment), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
+                                        Text(paymentStatusLabel(payment.status), style = MaterialTheme.typography.labelSmall, color = if (payment.status == "succeeded") Color(0xFF15803D) else Color(0xFFB45309))
+                                    }
+                                    Text("${paymentDate(payment)} · ${payment.amountRub} ₽", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                                    if (payment.receiptUrl.isNotBlank()) {
+                                        TextButton(onClick = {
+                                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(payment.receiptUrl))) }
+                                        }) { Text("Открыть чек") }
+                                    } else if (payment.receiptStatus == "pending") {
+                                        Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
                 Text(
                     "Период Student",
                     style = MaterialTheme.typography.titleSmall,
@@ -238,41 +274,6 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                 }
 
 
-                if (payments.isNotEmpty()) {
-                    TextButton(
-                        onClick = { historyExpanded = !historyExpanded },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    ) {
-                        Text(
-                            if (historyExpanded) "Скрыть историю платежей" else "История платежей (${payments.size})",
-                            color = Color(0xFF4338CA),
-                        )
-                    }
-                    if (historyExpanded) {
-                        payments.forEach { payment ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(14.dp),
-                                colors = CardDefaults.cardColors(containerColor = Color.White),
-                            ) {
-                                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                        Text(paymentLabel(payment), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold)
-                                        Text(paymentStatusLabel(payment.status), style = MaterialTheme.typography.labelSmall, color = if (payment.status == "succeeded") Color(0xFF15803D) else Color(0xFFB45309))
-                                    }
-                                    Text("${paymentDate(payment)} · ${payment.amountRub} ₽", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-                                    if (payment.receiptUrl.isNotBlank()) {
-                                        TextButton(onClick = {
-                                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(payment.receiptUrl))) }
-                                        }) { Text("Открыть чек") }
-                                    } else if (payment.receiptStatus == "pending") {
-                                        Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
         }
     }
