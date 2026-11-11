@@ -581,8 +581,7 @@ fun RecorderScreen(
                                     seekByItem[id] = value
                                     onSeekRecording(id, value)
                                 },
-                                onRequestConspect = onRequestConspect,
-                                onDelete = { id -> onDeleteRecordings(setOf(id)) }
+                                onRequestConspect = onRequestConspect
                             )
                             }
                         }
@@ -665,12 +664,18 @@ private fun HistoryDateHeader(bucket: HistoryBucket, count: Int) {
 
 @Composable
 private fun IconChip(icon: ImageVector, contentDescription: String, enabled: Boolean, onClick: () -> Unit) {
-    IconButton(modifier = Modifier.size(28.dp), onClick = onClick, enabled = enabled) {
+    IconButton(
+        modifier = Modifier
+            .size(38.dp)
+            .background(if (enabled) Color(0xFFEEF2FF) else Color(0xFFE2E8F0), CircleShape),
+        onClick = onClick,
+        enabled = enabled,
+    ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = if (enabled) Color(0xFF0F172A) else Color(0xFF94A3B8),
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(19.dp)
         )
     }
 }
@@ -696,11 +701,8 @@ private fun RecordingItemRow(
     onPause: (String) -> Unit,
     onStop: (String) -> Unit,
     onSeek: (String, Float) -> Unit,
-    onRequestConspect: (String) -> Unit,
-    onDelete: (String) -> Unit
+    onRequestConspect: (String) -> Unit
 ) {
-    var menuExpanded by remember { mutableStateOf(false) }
-    var deleteConfirm by remember { mutableStateOf(false) }
     val safeDuration = playbackDurationMs.coerceAtLeast(1L)
     var sliderState by remember(progress, safeDuration) { mutableFloatStateOf(progress.coerceIn(0f, 1f)) }
     val isRecognizing = item.conspectStatus == "queued" || item.conspectStatus == "running"
@@ -714,13 +716,12 @@ private fun RecordingItemRow(
             delay(1_000L)
         }
     }
-    Box {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { if (isSelectionMode) onToggleSelection() else onFocus() },
-                onLongClick = { if (isSelectionMode) onToggleSelection() else menuExpanded = true }
+                onLongClick = { if (isSelectionMode) onToggleSelection() else onEnterSelection() }
             ),
         colors = CardDefaults.cardColors(containerColor = if (isSelected) Color(0xFFDDEAFD) else Color.White),
         shape = RoundedCornerShape(14.dp),
@@ -886,57 +887,6 @@ private fun RecordingItemRow(
                 }
             }
         }
-    }
-    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-        DropdownMenuItem(
-            text = { Text("Прослушать") },
-            enabled = !isRecordingNow,
-            onClick = {
-                menuExpanded = false
-                onFocus()
-                onPlay(item.id, null)
-            },
-        )
-        if (item.status == UploadStatus.UPLOADED) {
-            DropdownMenuItem(
-                text = { Text("Сделать конспект") },
-                onClick = {
-                    menuExpanded = false
-                    onRequestConspect(item.id)
-                },
-            )
-        }
-        DropdownMenuItem(
-            text = { Text("Выбрать") },
-            onClick = {
-                menuExpanded = false
-                onEnterSelection()
-            },
-        )
-        DropdownMenuItem(
-            text = { Text("Удалить с устройства", color = Color(0xFFDC2626)) },
-            onClick = {
-                menuExpanded = false
-                deleteConfirm = true
-            },
-        )
-    }
-    if (deleteConfirm) {
-        AlertDialog(
-            onDismissRequest = { deleteConfirm = false },
-            title = { Text("Удалить запись?") },
-            text = { Text("Аудио будет удалено с устройства. Конспект в библиотеке останется.") },
-            confirmButton = {
-                TextButton(onClick = {
-                    deleteConfirm = false
-                    onDelete(item.id)
-                }) { Text("Удалить", color = Color(0xFFDC2626)) }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteConfirm = false }) { Text("Отмена") }
-            },
-        )
-    }
     }
 }
 
