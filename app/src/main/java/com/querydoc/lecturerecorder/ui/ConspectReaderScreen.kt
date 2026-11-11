@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.Box
@@ -514,7 +515,7 @@ private fun LectureQaContent(
                     }
                 }
             }
-            items(messages, key = { it.role + it.text.hashCode() }) { message ->
+            itemsIndexed(messages, key = { index, message -> "${index}_${message.role}" }) { _, message ->
                 val isUser = message.role == "user"
                 Row(
                     modifier = Modifier.fillMaxWidth(),
