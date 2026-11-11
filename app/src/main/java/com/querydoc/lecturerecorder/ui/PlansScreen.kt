@@ -173,12 +173,14 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                                         Text(paymentStatusLabel(payment.status), style = MaterialTheme.typography.labelSmall, color = if (payment.status == "succeeded") Color(0xFF15803D) else Color(0xFFB45309))
                                     }
                                     Text("${paymentDate(payment)} · ${payment.amountRub} ₽", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-                                    if (payment.receiptUrl.isNotBlank()) {
-                                        TextButton(onClick = {
-                                            runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(payment.receiptUrl))) }
-                                        }) { Text("Открыть чек") }
-                                    } else if (payment.receiptStatus == "pending") {
-                                        Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
+                                    if (payment.status == "succeeded") {
+                                        if (payment.receiptUrl.isNotBlank()) {
+                                            TextButton(onClick = {
+                                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(payment.receiptUrl))) }
+                                            }) { Text("Открыть чек") }
+                                        } else if (payment.receiptStatus == "pending") {
+                                            Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
+                                        }
                                     }
                                 }
                             }
