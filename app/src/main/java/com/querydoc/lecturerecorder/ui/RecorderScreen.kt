@@ -378,7 +378,6 @@ fun RecorderScreen(
                     label = "Запись",
                     enabled = !uiState.isRecording,
                     accent = Color(0xFFEF4444),
-                    primary = true,
                     onClick = onStartRecording,
                 )
                 ControlButton(
@@ -585,7 +584,8 @@ fun RecorderScreen(
                                     seekByItem[id] = value
                                     onSeekRecording(id, value)
                                 },
-                                onRequestConspect = onRequestConspect
+                                onRequestConspect = onRequestConspect,
+                                onDelete = { id -> onDeleteRecordings(setOf(id)) }
                             )
                             }
                         }
@@ -699,8 +699,11 @@ private fun RecordingItemRow(
     onPause: (String) -> Unit,
     onStop: (String) -> Unit,
     onSeek: (String, Float) -> Unit,
-    onRequestConspect: (String) -> Unit
+    onRequestConspect: (String) -> Unit,
+    onDelete: (String) -> Unit
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
+    var deleteConfirm by remember { mutableStateOf(false) }
     val safeDuration = playbackDurationMs.coerceAtLeast(1L)
     var sliderState by remember(progress, safeDuration) { mutableFloatStateOf(progress.coerceIn(0f, 1f)) }
     val isRecognizing = item.conspectStatus == "queued" || item.conspectStatus == "running"
@@ -714,12 +717,13 @@ private fun RecordingItemRow(
             delay(1_000L)
         }
     }
+    Box {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .combinedClickable(
                 onClick = { if (isSelectionMode) onToggleSelection() else onFocus() },
-                onLongClick = onEnterSelection
+                onLongClick = { if (isSelectionMode) onToggleSelection() else menuExpanded = true }
             ),
         colors = CardDefaults.cardColors(containerColor = if (isSelected) Color(0xFFDDEAFD) else Color.White),
         shape = RoundedCornerShape(14.dp),
@@ -886,6 +890,57 @@ private fun RecordingItemRow(
             }
         }
     }
+    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+        DropdownMenuItem(
+            text = { Text("Прослушать") },
+            enabled = !isRecordingNow,
+            onClick = {
+                menuExpanded = false
+                onFocus()
+                onPlay(item.id, null)
+            },
+        )
+        if (item.status == UploadStatus.UPLOADED) {
+            DropdownMenuItem(
+                text = { Text("Сделать конспект") },
+                onClick = {
+                    menuExpanded = false
+                    onRequestConspect(item.id)
+                },
+            )
+        }
+        DropdownMenuItem(
+            text = { Text("Выбрать") },
+            onClick = {
+                menuExpanded = false
+                onEnterSelection()
+            },
+        )
+        DropdownMenuItem(
+            text = { Text("Удалить с устройства", color = Color(0xFFDC2626)) },
+            onClick = {
+                menuExpanded = false
+                deleteConfirm = true
+            },
+        )
+    }
+    if (deleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { deleteConfirm = false },
+            title = { Text("Удалить запись?") },
+            text = { Text("Аудио будет удалено с устройства. Конспект в библиотеке останется.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    deleteConfirm = false
+                    onDelete(item.id)
+                }) { Text("Удалить", color = Color(0xFFDC2626)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteConfirm = false }) { Text("Отмена") }
+            },
+        )
+    }
+    }
 }
 
 private fun levelWord(level: Float): String = when {
@@ -901,10 +956,9 @@ private fun ControlButton(
     label: String,
     enabled: Boolean,
     accent: Color,
-    primary: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val diameter = if (primary) 76.dp else 60.dp
+    val diameter = 64.dp
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(3.dp),
@@ -915,15 +969,20 @@ private fun ControlButton(
             modifier = Modifier
                 .size(diameter)
                 .background(
-                    if (enabled) accent.copy(alpha = if (primary) 0.14f else 0.08f) else Color(0xFFE2E8F0),
+                    if (enabled) accent.copy(alpha = 0.10f) else Color(0xFFE2E8F0),
+                    CircleShape,
+                )
+                .border(
+                    1.dp,
+                    if (enabled) accent.copy(alpha = 0.28f) else Color(0xFFCBD5E1),
                     CircleShape,
                 ),
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
-                tint = if (!enabled) Color(0xFF94A3B8) else if (primary) accent else accent,
-                modifier = Modifier.size(if (primary) 36.dp else 26.dp),
+                tint = if (enabled) accent else Color(0xFF94A3B8),
+                modifier = Modifier.size(25.dp),
             )
         }
         Text(
