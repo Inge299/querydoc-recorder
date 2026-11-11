@@ -143,17 +143,24 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                         }
                     }
                 }
-                if (payments.isNotEmpty()) {
-                    TextButton(
-                        onClick = { historyExpanded = !historyExpanded },
-                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    ) {
+                TextButton(
+                    onClick = { historyExpanded = !historyExpanded },
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                ) {
+                    Text(
+                        if (historyExpanded) "Скрыть историю платежей" else "История платежей и чеки (${payments.size})",
+                        color = Color(0xFF4338CA),
+                    )
+                }
+                if (historyExpanded) {
+                    if (payments.isEmpty()) {
                         Text(
-                            if (historyExpanded) "Скрыть историю платежей" else "История платежей и чеки (${payments.size})",
-                            color = Color(0xFF4338CA),
+                            "Платежей пока нет",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF64748B),
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
                         )
-                    }
-                    if (historyExpanded) {
+                    } else {
                         payments.forEach { payment ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -180,7 +187,7 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                 }
 
                 Text(
-                    "Период Student",
+                    "Период оплаты тарифа",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF0F172A),
