@@ -473,9 +473,6 @@ fun RecorderScreen(
                             modifier = Modifier.horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
-                            IconChip(Icons.Filled.Delete, "Удалить текущую", enabled = uiState.currentPlaybackItemId != null) {
-                                uiState.currentPlaybackItemId?.let { onDeleteRecordings(setOf(it)) }
-                            }
                             IconChip(Icons.Filled.DoneAll, "Выбрать все", enabled = uiState.recordings.isNotEmpty()) {
                                 uiState.recordings.forEach { selectedMap[it.id] = true }
                             }
