@@ -9,6 +9,7 @@ data class RecordingListItem(
     val chunkPaths: List<String>,
     val chunkDurationsMs: List<Long>,
     val durationMs: Long,
+    val createdAtMs: Long = 0L,
     val createdAtLabel: String,
     val durationLabel: String,
     val status: UploadStatus,

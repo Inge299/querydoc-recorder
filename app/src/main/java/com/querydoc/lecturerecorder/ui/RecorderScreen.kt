@@ -535,6 +535,7 @@ fun RecorderScreen(
                     val stageGroups = RecordingStage.entries
                         .map { stage -> stage to visibleRecordings.filter { it.stage == stage } }
                         .filter { it.second.isNotEmpty() }
+                        .sortedByDescending { group -> group.second.maxOfOrNull { it.createdAtMs } ?: 0L }
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
@@ -941,6 +942,7 @@ private fun formatElapsed(ms: Long): String {
 }
 
 private fun itemHint(item: RecordingListItem): String = when {
+    item.status == UploadStatus.REJECTED -> "Слишком короткая — сохранена на устройстве"
     item.uploadedChunks < item.totalChunks && item.status != UploadStatus.FAILED -> "Загрузка в облако"
     item.conspectStatus == "queued" -> "В очереди на распознавание"
     item.conspectStatus == "running" -> "Распознаётся…"
@@ -949,6 +951,7 @@ private fun itemHint(item: RecordingListItem): String = when {
 }
 
 private fun hintColor(item: RecordingListItem): Color = when {
+    item.status == UploadStatus.REJECTED -> Color(0xFFB45309)
     item.conspectStatus == "failed" -> Color(0xFFDC2626)
     item.conspectStatus == "queued" || item.conspectStatus == "running" -> Color(0xFF7C3AED)
     item.uploadedChunks < item.totalChunks && item.status != UploadStatus.FAILED -> Color(0xFF0284C7)
@@ -994,6 +997,7 @@ private fun StatusIcon(status: UploadStatus) {
         UploadStatus.UPLOADING -> Triple(Icons.Filled.CloudUpload, Color(0xFF0284C7), "Загружается")
         UploadStatus.UPLOADED -> Triple(Icons.Filled.CheckCircle, Color(0xFF16A34A), "Загружено")
         UploadStatus.FAILED -> Triple(Icons.Filled.ErrorOutline, Color(0xFFDC2626), "Ошибка")
+        UploadStatus.REJECTED -> Triple(Icons.Filled.ErrorOutline, Color(0xFFB45309), "Слишком короткая")
     }
     Icon(imageVector = icon, contentDescription = cd, tint = tint, modifier = Modifier.size(14.dp))
 }

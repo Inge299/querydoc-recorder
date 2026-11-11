@@ -459,14 +459,15 @@ class RecorderViewModel(
                         }
                         if (result.status == 422) {
                             viewModelScope.launch(Dispatchers.IO) { api.deleteAudioSession(sessionId) }
-                            deleteLocalPackage(sessionId)
+                            markShortSession(sessionId)
                             _state.update {
                                 it.copy(
-                                    statusText = "Слишком короткая запись — удалена",
+                                    statusText = "Слишком короткая запись — сохранена в истории",
                                     conspectDialog = null,
                                 )
                             }
                             refreshUsage()
+                            refreshRecordings()
                             return@launch
                         }
                         val quotaError = result.code == "recording_quota_exceeded" || result.code == "session_too_long"
@@ -508,9 +509,10 @@ class RecorderViewModel(
                 }
                 if (tooShort) {
                     viewModelScope.launch(Dispatchers.IO) { api.deleteAudioSession(sessionId) }
-                    deleteLocalPackage(sessionId)
-                    _state.update { it.copy(statusText = "Слишком короткая запись — удалена", conspectDialog = null) }
+                    markShortSession(sessionId)
+                    _state.update { it.copy(statusText = "Слишком короткая запись — сохранена в истории", conspectDialog = null) }
                     refreshUsage()
+                    refreshRecordings()
                     return@launch
                 }
                 val finalState = current
@@ -685,6 +687,18 @@ class RecorderViewModel(
         if (state.value.currentPlaybackItemId != id) return
         viewModelScope.launch {
             startPlayback(item, fraction.coerceIn(0f, 1f))
+        }
+    }
+
+    private suspend fun markShortSession(sessionId: String) {
+        withContext(Dispatchers.IO) {
+            val items = dao.allAudioItems().filter { item ->
+                item.metadataJson?.contains("sessionId=$sessionId") == true
+            }
+            val now = System.currentTimeMillis()
+            items.forEach { item ->
+                dao.updateStatus(item.id, UploadStatus.REJECTED, item.retryCount, now)
+            }
         }
     }
 
@@ -1126,7 +1140,7 @@ class RecorderViewModel(
             ConspectCache.get(app, sessionId) != null
         }
         val stage = when {
-            uploadStatus == UploadStatus.FAILED -> RecordingStage.FAILED
+            uploadStatus == UploadStatus.FAILED || uploadStatus == UploadStatus.REJECTED -> RecordingStage.FAILED
             uploadStatus == UploadStatus.UPLOADED && recognized -> RecordingStage.RECOGNIZED
             uploadStatus == UploadStatus.UPLOADED -> RecordingStage.CLOUD
             else -> RecordingStage.LOCAL
@@ -1138,6 +1152,7 @@ class RecorderViewModel(
             chunkPaths = chunkPaths,
             chunkDurationsMs = chunkDurations,
             durationMs = totalDuration,
+            createdAtMs = createdAt,
             createdAtLabel = dateFormatter.format(Date(createdAt)),
             durationLabel = formatDuration(totalDuration),
             status = uploadStatus,
@@ -1167,6 +1182,7 @@ class RecorderViewModel(
     }
 
     private fun mergeStatus(statuses: List<UploadStatus>): UploadStatus {
+        if (statuses.any { it == UploadStatus.REJECTED }) return UploadStatus.REJECTED
         if (statuses.any { it == UploadStatus.FAILED }) return UploadStatus.FAILED
         if (statuses.any { it == UploadStatus.UPLOADING }) return UploadStatus.UPLOADING
         if (statuses.any { it == UploadStatus.PENDING }) return UploadStatus.PENDING

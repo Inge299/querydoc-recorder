@@ -4,5 +4,6 @@ enum class UploadStatus {
     PENDING,
     UPLOADING,
     UPLOADED,
-    FAILED
+    FAILED,
+    REJECTED
 }

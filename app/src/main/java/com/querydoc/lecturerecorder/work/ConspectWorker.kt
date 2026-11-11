@@ -18,6 +18,7 @@ import com.querydoc.lecturerecorder.MainActivity
 import com.querydoc.lecturerecorder.R
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectState
+import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
 import com.querydoc.lecturerecorder.data.local.AudioCache
@@ -70,8 +71,8 @@ class ConspectWorker(
                     }
                     if (result.status == 422) {
                         runCatching { api.deleteAudioSession(sessionId) }
-                        cleanupShortSession(sessionId)
-                        notifyFailed(sessionId, "Слишком короткая запись — удалена")
+                        markShortSession(sessionId)
+                        notifyFailed(sessionId, "Слишком короткая запись — сохранена в истории")
                         Diagnostics.warn(applicationContext, "ConspectWorker: too short $sessionId")
                         return Result.success()
                     }
@@ -89,16 +90,15 @@ class ConspectWorker(
         return Result.success()
     }
 
-    private suspend fun cleanupShortSession(sessionId: String) {
+    private suspend fun markShortSession(sessionId: String) {
         val dao = AppGraph.db(applicationContext).uploadQueueDao()
         val items = dao.allAudioItems().filter { item ->
             item.metadataJson?.contains("sessionId=$sessionId") == true
         }
+        val now = System.currentTimeMillis()
         items.forEach { item ->
-            runCatching { File(item.filePath).delete() }
-            runCatching { dao.deleteById(item.id) }
+            dao.updateStatus(item.id, UploadStatus.REJECTED, item.retryCount, now)
         }
-        AudioCache.clear(applicationContext, sessionId)
     }
 
     private fun notifyCompleted(sessionId: String, markdown: String) {
