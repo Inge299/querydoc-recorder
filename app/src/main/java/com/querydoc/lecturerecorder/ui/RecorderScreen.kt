@@ -470,8 +470,10 @@ fun RecorderScreen(
                     Text(text = "История", style = MaterialTheme.typography.bodySmall)
                     if (selectionMode) {
                         Row(
-                            modifier = Modifier.horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .padding(start = 4.dp, end = 8.dp, top = 2.dp, bottom = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             IconChip(Icons.Filled.DoneAll, "Выбрать все", enabled = uiState.recordings.isNotEmpty()) {
                                 uiState.recordings.forEach { selectedMap[it.id] = true }
@@ -666,15 +668,16 @@ private fun HistoryDateHeader(bucket: HistoryBucket, count: Int) {
 private fun IconChip(icon: ImageVector, contentDescription: String, enabled: Boolean, onClick: () -> Unit) {
     IconButton(
         modifier = Modifier
-            .size(38.dp)
-            .background(if (enabled) Color(0xFFEEF2FF) else Color(0xFFE2E8F0), CircleShape),
+            .size(40.dp)
+            .background(if (enabled) Color(0xFFE0E7FF) else Color(0xFFE2E8F0), CircleShape)
+            .border(1.dp, if (enabled) Color(0xFFC7D2FE) else Color(0xFFCBD5E1), CircleShape),
         onClick = onClick,
         enabled = enabled,
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (enabled) Color(0xFF0F172A) else Color(0xFF94A3B8),
+            tint = if (enabled) Color(0xFF4338CA) else Color(0xFF94A3B8),
             modifier = Modifier.size(19.dp)
         )
     }
