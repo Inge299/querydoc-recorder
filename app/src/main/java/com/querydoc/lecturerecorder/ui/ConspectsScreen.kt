@@ -75,6 +75,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectSummary
 import com.querydoc.lecturerecorder.data.remote.SubjectSummary
 import com.querydoc.lecturerecorder.work.ConspectCache
+import com.querydoc.lecturerecorder.study.StudyPlanStore
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -211,7 +212,9 @@ fun ConspectsScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Только готовые конспекты",
+                    text = StudyPlanStore.daysUntil(context)?.let { days ->
+                        if (days >= 0) "До экзамена: $days дн. · только готовые конспекты" else "Только готовые конспекты"
+                    } ?: "Только готовые конспекты",
                     color = Color(0xFF9CA3AF),
                     style = MaterialTheme.typography.bodySmall,
                 )

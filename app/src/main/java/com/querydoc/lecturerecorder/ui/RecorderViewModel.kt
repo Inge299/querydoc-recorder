@@ -913,6 +913,7 @@ class RecorderViewModel(
 
     fun refreshUsage() {
         viewModelScope.launch {
+            _state.update { it.copy(usageError = "") }
             when (val result = api.usage()) {
                 is ApiResult.Ok -> _state.update {
                     val allowedDays = result.value.storageDays.coerceAtLeast(7)
@@ -932,9 +933,12 @@ class RecorderViewModel(
                         storageDays = allowedDays,
                         audioRetentionDays = if (it.audioRetentionDays > allowedDays) allowedDays else it.audioRetentionDays,
                         usageLoaded = true,
+                        usageError = "",
                     )
                 }
-                is ApiResult.Failure -> Unit
+                is ApiResult.Failure -> _state.update {
+                    it.copy(usageError = result.message.ifBlank { "Не удалось загрузить лимиты. Проверьте VPN или DNS." })
+                }
             }
         }
     }

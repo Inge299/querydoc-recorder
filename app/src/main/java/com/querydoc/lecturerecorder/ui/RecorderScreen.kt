@@ -120,6 +120,7 @@ fun RecorderScreen(
     onRequestConspect: (String) -> Unit,
     onDismissConspect: () -> Unit,
     onOpenConspects: () -> Unit,
+    onRefreshUsage: () -> Unit,
     onOpenPlans: () -> Unit,
     onOpenSettings: () -> Unit,
     onOpenImport: () -> Unit,
@@ -352,6 +353,31 @@ fun RecorderScreen(
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(0xFF64748B),
                     )
+                }
+                if (uiState.usageError.isNotBlank()) {
+                    Text(
+                        uiState.usageError,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFB91C1C),
+                    )
+                    TextButton(onClick = onRefreshUsage, modifier = Modifier.padding(0.dp)) {
+                        Text("Проверить снова")
+                    }
+                } else if (
+                    uiState.usageLoaded &&
+                    bonusMinutes == 0 &&
+                    uiState.recordingLimitMinutes <= 90 &&
+                    uiState.recordingRemainingMinutes <= 15 &&
+                    !uiState.isRecording
+                ) {
+                    Text(
+                        "Бесплатный лимит почти закончился",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFFB45309),
+                    )
+                    TextButton(onClick = onOpenPlans, modifier = Modifier.padding(0.dp)) {
+                        Text("Student — 12 часов записи", color = Color(0xFF4338CA))
+                    }
                 }
             }
         }

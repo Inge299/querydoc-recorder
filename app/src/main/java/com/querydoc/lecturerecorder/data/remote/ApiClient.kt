@@ -263,7 +263,7 @@ class ApiClient(context: Context) {
     }
 
     private fun networkFailure(): ApiResult.Failure =
-        ApiResult.Failure(0, "network_error", "Нет подключения к интернету", true)
+        ApiResult.Failure(0, "network_error", "Не удалось подключиться к QueryDoc. Проверьте интернет, VPN или DNS.", true)
 
     fun hasSession(): Boolean = cookieJar.hasSessionCookie()
 

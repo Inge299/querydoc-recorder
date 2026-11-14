@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SettingsVoice
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -54,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.querydoc.lecturerecorder.BuildConfig
@@ -61,6 +64,13 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.UsageSummary
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
+import com.querydoc.lecturerecorder.study.StudyPlan
+import com.querydoc.lecturerecorder.study.StudyPlanStore
+import com.querydoc.lecturerecorder.work.StudyPlanScheduler
+import android.app.DatePickerDialog
+import java.text.DateFormat
+import java.util.Calendar
+import java.util.Date
 
 @Composable
 fun SettingsScreen(
@@ -99,6 +109,8 @@ fun SettingsScreen(
     var showRetentionDialog by remember { mutableStateOf(false) }
     var showStorageLimitDialog by remember { mutableStateOf(false) }
     var clearAudioConfirm by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var studyPlan by remember { mutableStateOf(StudyPlanStore.load(context)) }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
     var deleteDialog by remember { mutableStateOf(false) }
@@ -245,6 +257,51 @@ fun SettingsScreen(
                     subtitle = "Сменить тариф, докупить часы",
                     onClick = onOpenPlans,
                 )
+            }
+
+            SettingsSection(title = "УЧЁБА") {
+                SettingRow(
+                    icon = Icons.Filled.Schedule,
+                    title = "Дата экзамена",
+                    subtitle = studyPlan?.let {
+                        "${DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it.examAtMillis))} · напомним за ${it.reminderDays} дн."
+                    } ?: "Не задана",
+                    onClick = {
+                        val base = Calendar.getInstance().apply {
+                            studyPlan?.let { timeInMillis = it.examAtMillis }
+                        }
+                        DatePickerDialog(
+                            context,
+                            { _, year, month, day ->
+                                val selected = Calendar.getInstance().apply {
+                                    set(year, month, day, 9, 0, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }.timeInMillis
+                                StudyPlanStore.save(context, selected, 3)
+                                StudyPlanScheduler.schedule(context)
+                                studyPlan = StudyPlanStore.load(context)
+                            },
+                            base.get(Calendar.YEAR),
+                            base.get(Calendar.MONTH),
+                            base.get(Calendar.DAY_OF_MONTH),
+                        ).show()
+                    },
+                    trailing = { Chevron() },
+                )
+                if (studyPlan != null) {
+                    SettingDivider()
+                    SettingRow(
+                        icon = Icons.Filled.Close,
+                        title = "Убрать напоминание",
+                        subtitle = "Дата экзамена будет удалена",
+                        tint = Color(0xFFDC2626),
+                        onClick = {
+                            StudyPlanStore.clear(context)
+                            StudyPlanScheduler.schedule(context)
+                            studyPlan = null
+                        },
+                    )
+                }
             }
 
             SettingsSection(title = "ДОКУМЕНТЫ") {

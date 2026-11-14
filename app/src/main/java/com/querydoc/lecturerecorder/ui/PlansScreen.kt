@@ -180,6 +180,8 @@ fun PlansScreen(api: ApiClient, onBack: () -> Unit, onChanged: () -> Unit) {
                                             }) { Text("Открыть чек") }
                                         } else if (payment.receiptStatus == "pending") {
                                             Text("Чек готовится", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB45309))
+                                        } else if (payment.receiptStatus == "failed") {
+                                            Text("Чек не выпущен — напишите в поддержку", style = MaterialTheme.typography.bodySmall, color = Color(0xFFB91C1C))
                                         }
                                     }
                                 }

@@ -51,6 +51,7 @@ import com.querydoc.lecturerecorder.work.CleanupScheduler
 import com.querydoc.lecturerecorder.work.ConspectCache
 import com.querydoc.lecturerecorder.work.ConspectScheduler
 import com.querydoc.lecturerecorder.work.UploadScheduler
+import com.querydoc.lecturerecorder.work.StudyPlanScheduler
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -224,6 +225,12 @@ class MainActivity : ComponentActivity() {
                     viewModel.refreshRecordings()
                 }
             }
+            LaunchedEffect(loggedIn, onboardingDone) {
+                if (loggedIn && onboardingDone) {
+                    viewModel.refreshUsage()
+                    StudyPlanScheduler.schedule(applicationContext)
+                }
+            }
             LaunchedEffect(screen) {
                 val controller = WindowCompat.getInsetsController(window, window.decorView)
                 controller.isAppearanceLightStatusBars = screen != "intro"
@@ -263,6 +270,7 @@ class MainActivity : ComponentActivity() {
                             onRequestConspect = viewModel::requestConspect,
                             onDismissConspect = viewModel::dismissConspect,
                             onOpenConspects = { showConspects = true },
+                            onRefreshUsage = viewModel::refreshUsage,
                             onOpenPlans = { showPlans = true },
                             onOpenSettings = { showSettings = true },
                             onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*", "application/pdf", "text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },

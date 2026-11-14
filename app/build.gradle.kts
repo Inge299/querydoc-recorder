@@ -14,8 +14,8 @@ android {
         applicationId = "com.querydoc.lecturerecorder"
         minSdk = 29
         targetSdk = 35
-        versionCode = 27
-        versionName = "1.0.0"
+        versionCode = 28
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val apiBaseUrl = (project.findProperty("querydoc.apiBaseUrl") as String?) ?: "https://querydoc.ru"

@@ -25,6 +25,7 @@ data class RecorderUiState(
     val recordingBonusMinutes: Int = 0,
     val recordingRemainingMinutes: Int = 90,
     val usageLoaded: Boolean = false,
+    val usageError: String = "",
     val paywallRequested: Boolean = false,
     val soundLevel: Float = 0f,
     val averageSoundLevel: Float = 0f,
