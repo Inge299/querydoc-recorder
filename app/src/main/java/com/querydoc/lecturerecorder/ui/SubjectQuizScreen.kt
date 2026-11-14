@@ -46,6 +46,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.QuizQuestion
 import com.querydoc.lecturerecorder.data.remote.SubjectQuiz
 import com.querydoc.lecturerecorder.data.remote.SubjectSummary
+import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.study.SubjectQuizStore
 import kotlinx.coroutines.launch
 
@@ -84,6 +85,7 @@ fun SubjectQuizScreen(
                 finished = false
                 reportState = ""
                 SubjectQuizStore.setBankSize(context, subject.id, result.value.questions.size)
+                Analytics.track(context, "quiz_started", mapOf("subjectId" to subject.id))
             }
             is ApiResult.Failure -> error = result.message
         }
@@ -198,6 +200,11 @@ fun SubjectQuizScreen(
                                 submitted = true
                             } else if (index + 1 >= total) {
                                 finished = true
+                                Analytics.track(
+                                    context,
+                                    "quiz_completed",
+                                    mapOf("subjectId" to subject.id, "correct" to correctCount.toString(), "total" to total.toString()),
+                                )
                             } else {
                                 index += 1
                                 selected = -1
