@@ -236,13 +236,6 @@ fun ConspectsScreen(
         ) {
             Column {
                 Text(
-                    text = "БИБЛИОТЕКА",
-                    color = Color(0xFFC7D2FE),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
                     text = if (items.isEmpty()) "Пока пусто" else "${items.size} ${conspectWord(items.size)}",
                     color = Color.White,
                     fontSize = 26.sp,

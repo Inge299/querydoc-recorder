@@ -29,7 +29,6 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -130,8 +129,6 @@ fun SubjectsManagerScreen(
         } ?: StudyPlanStore.forSubject(context, subject.id, subject.name)
     }
 
-    fun formatMinutes(total: Int): String =
-        if (total >= 60) "${total / 60} ч${if (total % 60 > 0) " ${total % 60} мин" else ""}" else "$total мин"
 
     fun openExamPicker(subject: SubjectSummary) {
         val base = Calendar.getInstance().apply {
@@ -270,21 +267,6 @@ fun SubjectsManagerScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(displaySubjectName(subject.name), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-                                val (reviewed, total, minutes) = metricsFor(subject)
-                                val progress = if (total > 0) reviewed.toFloat() / total else 0f
-                                Text(
-                                    if (total > 0) "Просмотрено $reviewed из $total · ~${formatMinutes(minutes)}" else "Материалов пока нет",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFF64748B),
-                                )
-                                if (total > 0) {
-                                    LinearProgressIndicator(
-                                        progress = { progress },
-                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                        color = if (progress >= 0.7f) Color(0xFF15803D) else Color(0xFF4338CA),
-                                        trackColor = Color(0xFFE2E8F0),
-                                    )
-                                }
                                 val deadline = deadlineFor(subject)
                                 val days = deadline?.daysUntil()
                                 Text(

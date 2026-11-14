@@ -88,7 +88,11 @@ fun SubjectQuizScreen(
                 SubjectQuizStore.setBankSize(context, subject.id, result.value.questions.size)
                 Analytics.track(context, "quiz_started", mapOf("subjectId" to subject.id))
             }
-            is ApiResult.Failure -> error = result.message
+            is ApiResult.Failure -> error = when {
+                result.status == 404 -> "Проверка знаний пока недоступна: сервер ещё не обновлён. Попробуйте после обновления приложения."
+                result.code == "study_kit_quota_exceeded" -> result.message
+                else -> result.message
+            }
         }
         loading = false
     }
