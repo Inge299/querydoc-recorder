@@ -212,8 +212,8 @@ fun ConspectsScreen(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = StudyPlanStore.daysUntil(context)?.let { days ->
-                        if (days >= 0) "До экзамена: $days дн. · только готовые конспекты" else "Только готовые конспекты"
+                    text = StudyPlanStore.nearest(context)?.daysUntil()?.let { days ->
+                        if (days >= 0) "Ближайший экзамен: через $days дн. · только готовые конспекты" else "Только готовые конспекты"
                     } ?: "Только готовые конспекты",
                     color = Color(0xFF9CA3AF),
                     style = MaterialTheme.typography.bodySmall,
@@ -267,10 +267,14 @@ fun ConspectsScreen(
                 ) {
                     subjectGroups.forEach { (subject, rows) ->
                         item(key = "subject_$subject") {
+                            val subjectDeadline = rows.firstOrNull { it.subjectId.isNotBlank() }?.let { row ->
+                                StudyPlanStore.forSubject(context, row.subjectId, subject)
+                            }
                             SubjectHeader(
                                 subject = subject,
                                 count = rows.size,
                                 hasUnread = rows.any { it.sessionId !in seenSessionIds },
+                                examDays = subjectDeadline?.daysUntil(),
                                 lastLectureDate = rows.maxOfOrNull { it.completedAt }?.let { formatSubjectDate(it) }.orEmpty(),
                                 expanded = subject in expandedSubjects,
                                 onToggle = {
@@ -490,7 +494,7 @@ private fun formatSubjectDate(value: String): String {
 }
 
 @Composable
-private fun SubjectHeader(subject: String, count: Int, hasUnread: Boolean, lastLectureDate: String, expanded: Boolean, onToggle: () -> Unit) {
+private fun SubjectHeader(subject: String, count: Int, hasUnread: Boolean, examDays: Long?, lastLectureDate: String, expanded: Boolean, onToggle: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -537,6 +541,15 @@ private fun SubjectHeader(subject: String, count: Int, hasUnread: Boolean, lastL
                         if (lastLectureDate.isNotBlank()) {
                             append(" · последняя ")
                             append(lastLectureDate)
+                        }
+                        if (examDays != null) {
+                            append(
+                                when {
+                                    examDays < 0 -> " · экзамен прошёл"
+                                    examDays == 0L -> " · экзамен сегодня"
+                                    else -> " · экзамен через $examDays дн."
+                                },
+                            )
                         }
                     },
                     style = MaterialTheme.typography.labelSmall,

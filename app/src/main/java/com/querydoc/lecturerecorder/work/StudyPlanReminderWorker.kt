@@ -22,9 +22,11 @@ class StudyPlanReminderWorker(
     workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
-        val plan = StudyPlanStore.load(applicationContext) ?: return Result.success()
-        val days = StudyPlanStore.daysUntil(applicationContext) ?: return Result.success()
-        if (days > plan.reminderDays) return Result.success()
+        val today = StudyPlanStore.all(applicationContext).filter { deadline ->
+            val days = deadline.daysUntil()
+            days == 0L || days == 1L || days == deadline.reminderDays.toLong()
+        }
+        if (today.isEmpty()) return Result.success()
 
         ensureChannel()
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -40,8 +42,15 @@ class StudyPlanReminderWorker(
             applicationContext, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val title = if (days <= 0) "Экзамен сегодня" else "До экзамена $days дн."
-        val text = "Повторите конспекты и вопросы к лекциям в QueryDoc."
+        val title = if (today.size == 1) "Скоро экзамен" else "Скоро экзамены"
+        val text = today.joinToString("\n") { deadline ->
+            val days = deadline.daysUntil()
+            when {
+                days <= 0L -> "${deadline.subjectName}: сегодня"
+                days == 1L -> "${deadline.subjectName}: завтра"
+                else -> "${deadline.subjectName}: через $days дн."
+            }
+        }
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_conspect)
             .setContentTitle(title)
@@ -64,7 +73,7 @@ class StudyPlanReminderWorker(
                 "Учёба и дедлайны",
                 NotificationManager.IMPORTANCE_HIGH,
             ).apply {
-                description = "Напоминания о дате экзамена"
+                description = "Напоминания об экзаменах по предметам"
             },
         )
     }
