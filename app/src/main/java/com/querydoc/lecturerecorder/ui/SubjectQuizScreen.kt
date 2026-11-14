@@ -69,12 +69,13 @@ fun SubjectQuizScreen(
     var retry by remember(subject.id) { mutableIntStateOf(0) }
     var regenerate by remember(subject.id) { mutableStateOf(false) }
     var reportState by remember(subject.id) { mutableStateOf("") }
+    var focusTopics by remember(subject.id) { mutableStateOf<List<String>>(emptyList()) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(subject.id, retry) {
         loading = true
         error = ""
-        when (val result = api.subjectQuiz(subject.id, regenerate)) {
+        when (val result = api.subjectQuiz(subject.id, regenerate, focusTopics)) {
             is ApiResult.Ok -> {
                 regenerate = false
                 quiz = result.value
@@ -127,7 +128,19 @@ fun SubjectQuizScreen(
                         Text("Слабые темы: ${stats.weakTopics.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFFB45309))
                     }
                     Button(onClick = onFinished, modifier = Modifier.fillMaxWidth()) { Text("К предметам") }
+                    if (stats.weakTopics.isNotEmpty()) {
+                        Button(
+                            onClick = {
+                                focusTopics = stats.weakTopics
+                                regenerate = true
+                                retry += 1
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = androidx.compose.ui.graphics.Color(0xFFB45309)),
+                        ) { Text("Повторить слабые темы") }
+                    }
                     TextButton(onClick = {
+                        focusTopics = emptyList()
                         regenerate = true
                         retry += 1
                     }, modifier = Modifier.fillMaxWidth()) { Text("Новые вопросы") }

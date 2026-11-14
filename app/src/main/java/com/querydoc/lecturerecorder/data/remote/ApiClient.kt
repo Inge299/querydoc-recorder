@@ -1091,11 +1091,19 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun subjectQuiz(subjectId: String, refresh: Boolean = false): ApiResult<SubjectQuiz> = withContext(Dispatchers.IO) {
+    suspend fun subjectQuiz(
+        subjectId: String,
+        refresh: Boolean = false,
+        focusTopics: List<String> = emptyList(),
+    ): ApiResult<SubjectQuiz> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject()
+            .put("subjectId", subjectId)
+            .put("refresh", refresh)
+            .put("focusTopics", JSONArray(focusTopics))
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/subjects/quiz")
-            .post(JSONObject().put("subjectId", subjectId).put("refresh", refresh).toString().toRequestBody(JSON))
+            .post(payload.toString().toRequestBody(JSON))
             .build()
         val response = execute(request) ?: return@withContext networkFailure()
         response.use { response ->
