@@ -51,10 +51,8 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.SubjectSummary
 import com.querydoc.lecturerecorder.data.remote.ConspectSummary
-import com.querydoc.lecturerecorder.data.remote.ServerQuizStats
 import com.querydoc.lecturerecorder.study.StudyPlanStore
 import com.querydoc.lecturerecorder.study.SubjectDeadline
-import com.querydoc.lecturerecorder.study.SubjectQuizStore
 import com.querydoc.lecturerecorder.work.StudyPlanScheduler
 import android.app.DatePickerDialog
 import java.text.DateFormat
@@ -77,7 +75,6 @@ fun SubjectsManagerScreen(
     var editing by remember { mutableStateOf<SubjectSummary?>(null) }
     var editName by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<SubjectSummary?>(null) }
-    var quizSubject by remember { mutableStateOf<SubjectSummary?>(null) }
     var busy by remember { mutableStateOf(false) }
     var conspects by remember { mutableStateOf<List<ConspectSummary>>(emptyList()) }
     val context = LocalContext.current
@@ -88,7 +85,6 @@ fun SubjectsManagerScreen(
         )
     }
     var deadlines by remember { mutableStateOf<Map<String, SubjectDeadline>>(emptyMap()) }
-    var serverQuizStats by remember { mutableStateOf<Map<String, ServerQuizStats>>(emptyMap()) }
     val scope = rememberCoroutineScope()
 
     fun rowsFor(subject: SubjectSummary): List<ConspectSummary> =
@@ -173,30 +169,12 @@ fun SubjectsManagerScreen(
                 is ApiResult.Ok -> conspects = result.value
                 is ApiResult.Failure -> Unit
             }
-            when (val result = api.subjectQuizStats()) {
-                is ApiResult.Ok -> serverQuizStats = result.value.associateBy { it.subjectId }
-                is ApiResult.Failure -> Unit
-            }
             loading = false
             refreshDeadlines()
         }
     }
 
     LaunchedEffect(Unit) { load(); refreshDeadlines() }
-    val activeQuiz = quizSubject
-    if (activeQuiz != null) {
-        SubjectQuizScreen(
-            api = api,
-            subject = activeQuiz,
-            onBack = { quizSubject = null },
-            onFinished = {
-                quizSubject = null
-                onChanged()
-                load()
-            },
-        )
-        return
-    }
     BackHandler { onBack() }
 
     Column(
@@ -327,33 +305,8 @@ fun SubjectsManagerScreen(
                                         else -> Color(0xFF4338CA)
                                     },
                                 )
-                                val localQuizStats = SubjectQuizStore.stats(context, subject.id)
-                                val remoteQuizStats = serverQuizStats[subject.id]
-                                if (remoteQuizStats != null && remoteQuizStats.attempts > 0) {
-                                    Text(
-                                        "Проверки: ${remoteQuizStats.attempts} ответов · точность ${remoteQuizStats.accuracy}% · готовность: ${remoteQuizStats.readiness}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF475569),
-                                    )
-                                    if (remoteQuizStats.weakTopics.isNotEmpty()) {
-                                        Text(
-                                            "Слабые темы: ${remoteQuizStats.weakTopics.joinToString(", ")}",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = Color(0xFFB45309),
-                                        )
-                                    }
-                                } else if (localQuizStats.attempts > 0) {
-                                    Text(
-                                        "Проверки: ${localQuizStats.attempts} ответов · точность ${localQuizStats.accuracy}% · готовность: ${SubjectQuizStore.readiness(localQuizStats)}",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF475569),
-                                    )
-                                }
-                                if (subject.count > 0) {
-                                    TextButton(onClick = { quizSubject = subject }, modifier = Modifier.padding(0.dp)) {
-                                        Text("Проверить знания", color = Color(0xFF4338CA))
-                                    }
-                                }
+
+
                             }
                             IconButton(onClick = { openExamPicker(subject) }) {
                                 Icon(Icons.Filled.Schedule, contentDescription = "Дата экзамена", tint = Color(0xFF4338CA), modifier = Modifier.size(19.dp))

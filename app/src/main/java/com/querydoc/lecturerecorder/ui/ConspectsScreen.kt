@@ -106,6 +106,8 @@ fun ConspectsScreen(
     var showSubjectsManager by remember { mutableStateOf(false) }
     var expandedSubjects by remember { mutableStateOf<Set<String>>(emptySet()) }
     var pendingScrollSubject by remember { mutableStateOf<String?>(null) }
+    var mode by remember { mutableStateOf("library") }
+    var trainingQuizSubject by remember { mutableStateOf<SubjectSummary?>(null) }
     val listState = rememberLazyListState()
     var deleting by remember { mutableStateOf(false) }
     var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
@@ -151,6 +153,17 @@ fun ConspectsScreen(
         loading = false
     }
 
+    val activeTrainingQuiz = trainingQuizSubject
+    if (activeTrainingQuiz != null) {
+        SubjectQuizScreen(
+            api = api,
+            subject = activeTrainingQuiz,
+            onBack = { trainingQuizSubject = null },
+            onFinished = { trainingQuizSubject = null },
+        )
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -191,6 +204,22 @@ fun ConspectsScreen(
             IconButton(onClick = { reload += 1 }) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Обновить", tint = Color(0xFF4338CA))
             }
+        }
+
+        Row(
+            modifier = Modifier
+                .padding(horizontal = 14.dp, vertical = 4.dp)
+                .fillMaxWidth()
+                .background(Color(0xFFE7EAF3), RoundedCornerShape(12.dp))
+                .padding(3.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+        ) {
+            ModeTab("Библиотека", mode == "library", Modifier.weight(1f)) { mode = "library" }
+            ModeTab("Тренировка", mode == "training", Modifier.weight(1f)) { mode = "training" }
+        }
+        if (mode == "training") {
+            TrainingScreen(api = api, onOpenQuiz = { trainingQuizSubject = it })
+            return
         }
 
         Box(
@@ -534,6 +563,26 @@ private fun formatSubjectDate(value: String): String {
 }
 
 @Composable
+private fun ModeTab(
+    label: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
+    Text(
+        text = label,
+        modifier = modifier
+            .background(if (selected) Color.White else Color.Transparent, RoundedCornerShape(9.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        style = MaterialTheme.typography.labelMedium,
+        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        color = if (selected) Color(0xFF4338CA) else Color(0xFF64748B),
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+    )
+}
+
+@Composable
 private fun ReviewQueueCard(items: List<ReviewQueueItem>, onOpenSubject: (String) -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -588,11 +637,11 @@ private fun SubjectHeader(subject: String, count: Int, hasUnread: Boolean, examD
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .background(Color(0xFFEEF2FF), RoundedCornerShape(10.dp)),
+                    .size(42.dp)
+                    .background(Color(0xFFE0E7FF), RoundedCornerShape(12.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.Folder, contentDescription = null, tint = Color(0xFF4338CA), modifier = Modifier.size(19.dp))
+                Icon(Icons.Filled.Folder, contentDescription = null, tint = Color(0xFF3730A3), modifier = Modifier.size(23.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -669,12 +718,12 @@ private fun ConspectRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(36.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF4338CA), Color(0xFF7C6AE8)))),
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Brush.linearGradient(listOf(Color(0xFF5B4BC4), Color(0xFF8B7DE8)))),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
+                Icon(Icons.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(17.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
                 Row(
