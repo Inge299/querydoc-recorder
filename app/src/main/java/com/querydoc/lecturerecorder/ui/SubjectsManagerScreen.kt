@@ -29,6 +29,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -49,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.SubjectSummary
+import com.querydoc.lecturerecorder.data.remote.ConspectSummary
 import com.querydoc.lecturerecorder.study.StudyPlanStore
 import com.querydoc.lecturerecorder.study.SubjectDeadline
 import com.querydoc.lecturerecorder.work.StudyPlanScheduler
@@ -57,6 +59,8 @@ import java.text.DateFormat
 import java.util.Calendar
 import java.util.Date
 import kotlinx.coroutines.launch
+import kotlin.math.ceil
+import kotlin.math.max
 
 @Composable
 fun SubjectsManagerScreen(
@@ -72,11 +76,49 @@ fun SubjectsManagerScreen(
     var editName by remember { mutableStateOf("") }
     var deleting by remember { mutableStateOf<SubjectSummary?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var conspects by remember { mutableStateOf<List<ConspectSummary>>(emptyList()) }
     val context = LocalContext.current
+    var seenIds by remember {
+        mutableStateOf(
+            context.getSharedPreferences("conspect_prefs", android.content.Context.MODE_PRIVATE)
+                .getStringSet("seen_session_ids", emptySet())?.toSet() ?: emptySet(),
+        )
+    }
     var deadlines by remember { mutableStateOf<Map<String, SubjectDeadline>>(emptyMap()) }
     val scope = rememberCoroutineScope()
 
+    fun rowsFor(subject: SubjectSummary): List<ConspectSummary> =
+        conspects.filter {
+            (it.subjectId.isNotBlank() && it.subjectId == subject.id) ||
+                (it.subjectId.isBlank() && it.subject.trim().equals(subject.name.trim(), ignoreCase = true))
+        }
+
+    fun estimatedMinutes(rows: List<ConspectSummary>): Int =
+        rows.sumOf { row -> max(10, ceil((row.length.coerceAtLeast(1) / 1000.0) * 5.0).toInt()) }
+
+    fun metricsFor(subject: SubjectSummary): Triple<Int, Int, Int> {
+        val rows = rowsFor(subject)
+        val total = max(rows.size, subject.count)
+        val reviewed = rows.count { it.sessionId in seenIds }
+        val minutes = estimatedMinutes(rows)
+        return Triple(reviewed, total, minutes)
+    }
+
     fun refreshDeadlines() {
+        val existing = StudyPlanStore.all(context)
+        existing.forEach { deadline ->
+            val subject = items.firstOrNull { item ->
+                (item.id.isNotBlank() && item.id == deadline.subjectId) ||
+                    item.name.trim().equals(deadline.subjectName.trim(), ignoreCase = true)
+            } ?: return@forEach
+            val (reviewed, total, minutes) = metricsFor(subject)
+            if (reviewed != deadline.reviewedCount || total != deadline.totalCount || minutes != deadline.estimatedMinutes) {
+                StudyPlanStore.set(
+                    context, subject.id, subject.name, deadline.examAtMillis, deadline.reminderDays,
+                    minutes, reviewed, total,
+                )
+            }
+        }
         deadlines = StudyPlanStore.all(context).associateBy { it.key }
     }
 
@@ -87,6 +129,9 @@ fun SubjectsManagerScreen(
             it.subjectName.trim().equals(subject.name.trim(), ignoreCase = true)
         } ?: StudyPlanStore.forSubject(context, subject.id, subject.name)
     }
+
+    fun formatMinutes(total: Int): String =
+        if (total >= 60) "${total / 60} ч${if (total % 60 > 0) " ${total % 60} мин" else ""}" else "$total мин"
 
     fun openExamPicker(subject: SubjectSummary) {
         val base = Calendar.getInstance().apply {
@@ -99,7 +144,8 @@ fun SubjectsManagerScreen(
                     set(year, month, day, 9, 0, 0)
                     set(Calendar.MILLISECOND, 0)
                 }.timeInMillis
-                StudyPlanStore.set(context, subject.id, subject.name, selected, 3)
+                val (reviewed, total, minutes) = metricsFor(subject)
+                StudyPlanStore.set(context, subject.id, subject.name, selected, 3, minutes, reviewed, total)
                 StudyPlanScheduler.schedule(context)
                 refreshDeadlines()
             },
@@ -116,11 +162,15 @@ fun SubjectsManagerScreen(
                 is ApiResult.Ok -> {
                     items = result.value
                     error = ""
-                    refreshDeadlines()
                 }
                 is ApiResult.Failure -> error = result.message
             }
+            when (val result = api.listConspects()) {
+                is ApiResult.Ok -> conspects = result.value
+                is ApiResult.Failure -> Unit
+            }
             loading = false
+            refreshDeadlines()
         }
     }
 
@@ -220,23 +270,40 @@ fun SubjectsManagerScreen(
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(displaySubjectName(subject.name), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+                                val (reviewed, total, minutes) = metricsFor(subject)
+                                val progress = if (total > 0) reviewed.toFloat() / total else 0f
                                 Text(
-                                    if (subject.count > 0) "${subject.count} конспектов" else "Нет конспектов",
+                                    if (total > 0) "Просмотрено $reviewed из $total · ~${formatMinutes(minutes)}" else "Материалов пока нет",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = Color(0xFF64748B),
                                 )
+                                if (total > 0) {
+                                    LinearProgressIndicator(
+                                        progress = { progress },
+                                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                        color = if (progress >= 0.7f) Color(0xFF15803D) else Color(0xFF4338CA),
+                                        trackColor = Color(0xFFE2E8F0),
+                                    )
+                                }
+                                val deadline = deadlineFor(subject)
+                                val days = deadline?.daysUntil()
                                 Text(
-                                    text = deadlineFor(subject)?.let { deadline ->
-                                        val days = deadline.daysUntil()
-                                        val date = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(deadline.examAtMillis))
+                                    text = deadline?.let {
+                                        val date = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it.examAtMillis))
                                         when {
+                                            days == null -> "Экзамен: $date"
                                             days < 0 -> "Экзамен: $date"
                                             days == 0L -> "Экзамен сегодня · $date"
                                             else -> "Экзамен: $date · через $days дн."
                                         }
                                     } ?: "Экзамен не назначен",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = if (deadlineFor(subject) != null) Color(0xFF4338CA) else Color(0xFF94A3B8),
+                                    color = when {
+                                        deadline == null -> Color(0xFF94A3B8)
+                                        days != null && days <= 3 -> Color(0xFFB91C1C)
+                                        days != null && days <= 7 -> Color(0xFFB45309)
+                                        else -> Color(0xFF4338CA)
+                                    },
                                 )
                             }
                             IconButton(onClick = { openExamPicker(subject) }) {

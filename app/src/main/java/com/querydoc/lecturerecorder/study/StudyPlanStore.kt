@@ -12,6 +12,9 @@ data class SubjectDeadline(
     val subjectName: String,
     val examAtMillis: Long,
     val reminderDays: Int = 3,
+    val estimatedMinutes: Int = 0,
+    val reviewedCount: Int = 0,
+    val totalCount: Int = 0,
 ) {
     val key: String
         get() = if (subjectId.isNotBlank()) "id:$subjectId" else "name:${subjectName.trim().lowercase()}"
@@ -40,6 +43,9 @@ object StudyPlanStore {
                     subjectName = name,
                     examAtMillis = exam,
                     reminderDays = item.optInt("reminderDays", 3).coerceIn(1, 14),
+                    estimatedMinutes = item.optInt("estimatedMinutes", 0).coerceAtLeast(0),
+                    reviewedCount = item.optInt("reviewedCount", 0).coerceAtLeast(0),
+                    totalCount = item.optInt("totalCount", 0).coerceAtLeast(0),
                 )
             }.toList()
         }.getOrDefault(emptyList())
@@ -54,15 +60,30 @@ object StudyPlanStore {
         }
     }
 
-    fun set(context: Context, subjectId: String, subjectName: String, examAtMillis: Long, reminderDays: Int = 3) {
+    fun set(
+        context: Context,
+        subjectId: String,
+        subjectName: String,
+        examAtMillis: Long,
+        reminderDays: Int = 3,
+        estimatedMinutes: Int = 0,
+        reviewedCount: Int = 0,
+        totalCount: Int = 0,
+    ) {
         if (examAtMillis <= 0L || subjectName.trim().isBlank()) return
         val root = runCatching { JSONObject(prefs(context).getString(KEY_SUBJECTS, "") ?: "{}") }.getOrDefault(JSONObject())
-        val deadline = SubjectDeadline(subjectId.trim(), subjectName.trim(), examAtMillis, reminderDays.coerceIn(1, 14))
+        val deadline = SubjectDeadline(
+            subjectId.trim(), subjectName.trim(), examAtMillis, reminderDays.coerceIn(1, 14),
+            estimatedMinutes.coerceAtLeast(0), reviewedCount.coerceAtLeast(0), totalCount.coerceAtLeast(0),
+        )
         root.put(deadline.key, JSONObject().apply {
             put("subjectId", deadline.subjectId)
             put("subjectName", deadline.subjectName)
             put("examAtMillis", deadline.examAtMillis)
             put("reminderDays", deadline.reminderDays)
+            put("estimatedMinutes", deadline.estimatedMinutes)
+            put("reviewedCount", deadline.reviewedCount)
+            put("totalCount", deadline.totalCount)
         })
         prefs(context).edit().putString(KEY_SUBJECTS, root.toString()).apply()
     }

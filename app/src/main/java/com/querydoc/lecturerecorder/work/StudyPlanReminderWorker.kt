@@ -16,17 +16,21 @@ import androidx.work.WorkerParameters
 import com.querydoc.lecturerecorder.MainActivity
 import com.querydoc.lecturerecorder.R
 import com.querydoc.lecturerecorder.study.StudyPlanStore
+import com.querydoc.lecturerecorder.study.SubjectDeadline
+import kotlin.math.ceil
+import kotlin.math.max
 
 class StudyPlanReminderWorker(
     appContext: Context,
     workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
-        val today = StudyPlanStore.all(applicationContext).filter { deadline ->
+        val due = StudyPlanStore.all(applicationContext).filter { deadline ->
             val days = deadline.daysUntil()
-            days == 0L || days == 1L || days == deadline.reminderDays.toLong()
+            val threshold = reminderThresholdDays(deadline)
+            days >= 0L && (days == 0L || days == 1L || days == threshold)
         }
-        if (today.isEmpty()) return Result.success()
+        if (due.isEmpty()) return Result.success()
 
         ensureChannel()
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -42,14 +46,17 @@ class StudyPlanReminderWorker(
             applicationContext, 0, intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-        val title = if (today.size == 1) "Скоро экзамен" else "Скоро экзамены"
-        val text = today.joinToString("\n") { deadline ->
+        val title = if (due.size == 1) "Скоро экзамен" else "Скоро экзамены"
+        val text = due.joinToString("\n") { deadline ->
             val days = deadline.daysUntil()
-            when {
-                days <= 0L -> "${deadline.subjectName}: сегодня"
-                days == 1L -> "${deadline.subjectName}: завтра"
-                else -> "${deadline.subjectName}: через $days дн."
+            val remaining = remainingMinutes(deadline)
+            val whenLabel = when {
+                days <= 0L -> "сегодня"
+                days == 1L -> "завтра"
+                else -> "через $days дн."
             }
+            if (remaining > 0) "${deadline.subjectName}: $whenLabel · ~$remaining мин"
+            else "${deadline.subjectName}: $whenLabel"
         }
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_stat_conspect)
@@ -62,6 +69,19 @@ class StudyPlanReminderWorker(
             .build()
         NotificationManagerCompat.from(applicationContext).notify(NOTIFICATION_ID, notification)
         return Result.success()
+    }
+
+    private fun reminderThresholdDays(deadline: SubjectDeadline): Long {
+        val remaining = remainingMinutes(deadline)
+        if (remaining <= 0) return max(1L, deadline.reminderDays.toLong())
+        val requiredDays = ceil(remaining / 60.0).toLong().coerceAtLeast(1L)
+        return (requiredDays + 1L).coerceIn(1L, 7L)
+    }
+
+    private fun remainingMinutes(deadline: SubjectDeadline): Int {
+        if (deadline.totalCount <= 0 || deadline.estimatedMinutes <= 0) return 0
+        val left = (deadline.totalCount - deadline.reviewedCount).coerceAtLeast(0)
+        return max(10, (deadline.estimatedMinutes * left / deadline.totalCount.toDouble()).toInt())
     }
 
     private fun ensureChannel() {
