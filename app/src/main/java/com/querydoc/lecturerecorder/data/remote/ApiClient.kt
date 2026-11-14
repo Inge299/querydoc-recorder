@@ -630,9 +630,11 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun createDocumentConspect(materialFileId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    suspend fun createDocumentConspect(materialFileId: String, subjectHint: String = ""): ApiResult<Unit> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
-        val payload = JSONObject().put("materialFileId", materialFileId).toString()
+        val payload = JSONObject().put("materialFileId", materialFileId)
+            .put("subject", subjectHint.take(80))
+            .toString()
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/documents/conspect")
             .post(payload.toRequestBody(JSON))

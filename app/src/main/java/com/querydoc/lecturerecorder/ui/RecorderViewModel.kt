@@ -22,6 +22,7 @@ import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.media.AudioImportExtractor
 import com.querydoc.lecturerecorder.media.DocumentImportExtractor
+import com.querydoc.lecturerecorder.media.ImportRequest
 import com.querydoc.lecturerecorder.recording.AudioRecordingService
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 import com.querydoc.lecturerecorder.recording.IdleMicLevelMonitor
@@ -282,7 +283,7 @@ class RecorderViewModel(
         _state.update { it.copy(statusText = "Авторизация будет добавлена позже") }
     }
 
-    private val importQueue = ArrayDeque<Uri>()
+    private val importQueue = ArrayDeque<ImportRequest>()
     private var importRunning = false
     private var importBatchTotal = 0
     private var importBatchDone = 0
@@ -302,7 +303,11 @@ class RecorderViewModel(
     )
 
     fun startImports(uris: List<Uri>) {
-        val unique = uris.distinct()
+        startImportRequests(uris.distinct().map { ImportRequest(it) })
+    }
+
+    fun startImportRequests(requests: List<ImportRequest>) {
+        val unique = requests.distinctBy { it.uri }
         if (unique.isEmpty()) return
         if (!importRunning) {
             importBatchTotal = unique.size
@@ -327,7 +332,8 @@ class RecorderViewModel(
         }
     }
 
-    private fun importSingle(uri: Uri, onDone: () -> Unit) {
+    private fun importSingle(request: ImportRequest, onDone: () -> Unit) {
+        val uri = request.uri
         val mime = app.contentResolver.getType(uri).orEmpty().lowercase()
         val extension = (uri.lastPathSegment.orEmpty().substringAfterLast('.', "")).lowercase()
         if (
@@ -337,7 +343,7 @@ class RecorderViewModel(
             mime.contains("wordprocessingml.document") ||
             extension in setOf("pdf", "docx", "txt", "md", "markdown")
         ) {
-            startDocumentImport(uri, onDone)
+            startDocumentImport(uri, request.subjectHint, onDone)
             return
         }
         _state.update { it.copy(importState = importUi(ImportStage.PREPARING, message = "Готовим аудио…")) }
@@ -428,7 +434,7 @@ class RecorderViewModel(
         }
     }
 
-    private fun startDocumentImport(uri: Uri, onDone: () -> Unit = {}) {
+    private fun startDocumentImport(uri: Uri, subjectHint: String, onDone: () -> Unit = {}) {
         _state.update { it.copy(importState = importUi(ImportStage.PREPARING, message = "Готовим документ…")) }
         viewModelScope.launch {
             var preparedFile: File? = null
@@ -459,7 +465,7 @@ class RecorderViewModel(
                 _state.update {
                     it.copy(importState = importUi(ImportStage.PROCESSING, prepared.fileName, "Извлекаем текст и готовим конспект…"))
                 }
-                when (val conspect = api.createDocumentConspect(materialFileId)) {
+                when (val conspect = api.createDocumentConspect(materialFileId, subjectHint)) {
                     is ApiResult.Ok -> {
                         _state.update { it.copy(importState = importUi(ImportStage.READY, prepared.fileName, "Конспект документа готов", materialFileId)) }
                         refreshUsage()

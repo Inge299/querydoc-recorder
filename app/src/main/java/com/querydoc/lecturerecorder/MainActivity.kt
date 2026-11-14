@@ -12,7 +12,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -32,6 +35,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.diagnostics.CrashReporter
+import com.querydoc.lecturerecorder.media.FolderImport
 import com.querydoc.lecturerecorder.ui.ConspectReaderScreen
 import com.querydoc.lecturerecorder.ui.ConspectsScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
@@ -105,6 +109,7 @@ class MainActivity : ComponentActivity() {
             var showPlans by rememberSaveable { mutableStateOf(false) }
             var showNotifications by rememberSaveable { mutableStateOf(false) }
             var showSupport by rememberSaveable { mutableStateOf(false) }
+            var showImportSource by rememberSaveable { mutableStateOf(false) }
             var unreadNotifications by remember { mutableStateOf(0) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
@@ -118,6 +123,22 @@ class MainActivity : ComponentActivity() {
                     showNotifications = false
                     showSupport = false
                     readerSession = null
+                }
+            }
+            val folderImportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { treeUri ->
+                if (treeUri != null) {
+                    val requests = FolderImport.collect(applicationContext, treeUri)
+                    if (requests.isEmpty()) {
+                        Toast.makeText(applicationContext, "В папке нет поддерживаемых файлов", Toast.LENGTH_SHORT).show()
+                    } else {
+                        viewModel.startImportRequests(requests)
+                        showSettings = false
+                        showPlans = false
+                        showConspects = false
+                        showNotifications = false
+                        showSupport = false
+                        readerSession = null
+                    }
                 }
             }
             LaunchedEffect(Unit) {
@@ -248,7 +269,32 @@ class MainActivity : ComponentActivity() {
             }
             MaterialTheme {
                 Surface {
-                    Crossfade(targetState = screen, animationSpec = tween(360), label = "querydoc-root") { target ->
+                    if (showImportSource) {
+                AlertDialog(
+                    onDismissRequest = { showImportSource = false },
+                    title = { Text("Импорт лекций") },
+                    text = { Text("Выберите один или несколько файлов либо папку с лекциями. Название папки станет предметом.") },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            showImportSource = false
+                            importLauncher.launch(
+                                arrayOf(
+                                    "audio/*", "video/*", "application/pdf", "text/plain",
+                                    "text/markdown",
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                ),
+                            )
+                        }) { Text("Файлы") }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showImportSource = false
+                            folderImportLauncher.launch(null)
+                        }) { Text("Папку") }
+                    },
+                )
+            }
+            Crossfade(targetState = screen, animationSpec = tween(360), label = "querydoc-root") { target ->
                         when (target) {
                             "intro" -> IntroScreen()
                             "recorder" -> RecorderScreen(
@@ -273,7 +319,7 @@ class MainActivity : ComponentActivity() {
                             onRefreshUsage = viewModel::refreshUsage,
                             onOpenPlans = { showPlans = true },
                             onOpenSettings = { showSettings = true },
-                            onOpenImport = { importLauncher.launch(arrayOf("audio/*", "video/*", "application/pdf", "text/plain", "text/markdown", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")) },
+                            onOpenImport = { showImportSource = true },
                             onDismissImport = viewModel::clearImportState,
                             unreadNotifications = unreadNotifications,
                             onOpenNotifications = { showNotifications = true }
