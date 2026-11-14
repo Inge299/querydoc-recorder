@@ -81,6 +81,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+private data class ReviewQueueItem(
+    val subject: String,
+    val unseen: Int,
+    val examDays: Long?,
+)
+
 @Composable
 fun ConspectsScreen(
     api: ApiClient,
@@ -260,11 +266,28 @@ fun ConspectsScreen(
                         }
                     }
                     .sortedWith(compareBy({ it.first == "Без предмета" }, { it.first }))
+                val reviewItems = subjectGroups.mapNotNull { (subject, rows) ->
+                    if (subject == "Без предмета") return@mapNotNull null
+                    val unseen = rows.count { it.sessionId !in seenSessionIds }
+                    if (unseen <= 0) return@mapNotNull null
+                    val deadline = rows.firstOrNull { it.subjectId.isNotBlank() }?.let { row ->
+                        StudyPlanStore.forSubject(context, row.subjectId, subject)
+                    }
+                    ReviewQueueItem(subject, unseen, deadline?.daysUntil())
+                }.sortedWith(compareBy({ it.examDays == null }, { it.examDays ?: Long.MAX_VALUE }, { -it.unseen })).take(3)
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    if (reviewItems.isNotEmpty()) {
+                        item(key = "review_queue") {
+                            ReviewQueueCard(
+                                items = reviewItems,
+                                onOpenSubject = { subject -> expandedSubjects = expandedSubjects + subject },
+                            )
+                        }
+                    }
                     subjectGroups.forEach { (subject, rows) ->
                         item(key = "subject_$subject") {
                             val subjectDeadline = rows.firstOrNull { it.subjectId.isNotBlank() }?.let { row ->
@@ -491,6 +514,44 @@ private fun formatSubjectDate(value: String): String {
             .withZone(ZoneId.systemDefault())
             .format(Instant.parse(value))
     }.getOrElse { value.take(10) }
+}
+
+@Composable
+private fun ReviewQueueCard(items: List<ReviewQueueItem>, onOpenSubject: (String) -> Unit) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBEB)),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("ЧТО ПОВТОРИТЬ", style = MaterialTheme.typography.labelMedium, color = Color(0xFF92400E), fontWeight = FontWeight.SemiBold)
+            items.forEach { item ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { onOpenSubject(item.subject) },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(item.subject, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = Color(0xFF0F172A))
+                        Text(
+                            buildString {
+                                append("${item.unseen} ${conspectWord(item.unseen)}")
+                                when {
+                                    item.examDays == null -> Unit
+                                    item.examDays < 0 -> append(" · экзамен прошёл")
+                                    item.examDays == 0L -> append(" · экзамен сегодня")
+                                    else -> append(" · экзамен через ${item.examDays} дн.")
+                                }
+                            },
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFF92400E),
+                        )
+                    }
+                    Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFFB45309), modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    }
 }
 
 @Composable
