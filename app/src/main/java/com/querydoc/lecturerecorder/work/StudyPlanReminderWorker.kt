@@ -25,9 +25,16 @@ class StudyPlanReminderWorker(
     workerParams: WorkerParameters,
 ) : CoroutineWorker(appContext, workerParams) {
     override suspend fun doWork(): Result {
-        val due = StudyPlanStore.all(applicationContext).filter { deadline ->
+        val all = StudyPlanStore.all(applicationContext)
+        val totalRemaining = all.sumOf { remainingMinutes(it) }
+        val globalThreshold = if (totalRemaining > 0) {
+            ceil(totalRemaining / 60.0).toLong().plus(1L).coerceIn(1L, 7L)
+        } else {
+            1L
+        }
+        val due = all.filter { deadline ->
             val days = deadline.daysUntil()
-            val threshold = reminderThresholdDays(deadline)
+            val threshold = max(reminderThresholdDays(deadline), globalThreshold)
             days >= 0L && (days == 0L || days == 1L || days == threshold)
         }
         if (due.isEmpty()) return Result.success()
