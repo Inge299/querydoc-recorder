@@ -62,4 +62,6 @@ data class ImportUiState(
     val fileName: String = "",
     val message: String = "",
     val sessionId: String? = null,
+    val batchIndex: Int = 0,
+    val batchTotal: Int = 0,
 )

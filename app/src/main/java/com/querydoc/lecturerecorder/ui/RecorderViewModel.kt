@@ -282,7 +282,52 @@ class RecorderViewModel(
         _state.update { it.copy(statusText = "Авторизация будет добавлена позже") }
     }
 
-    fun startImport(uri: Uri) {
+    private val importQueue = ArrayDeque<Uri>()
+    private var importRunning = false
+    private var importBatchTotal = 0
+    private var importBatchDone = 0
+
+    private fun importUi(
+        stage: ImportStage,
+        fileName: String = "",
+        message: String = "",
+        sessionId: String? = null,
+    ) = ImportUiState(
+        stage = stage,
+        fileName = fileName,
+        message = message,
+        sessionId = sessionId,
+        batchIndex = importBatchDone,
+        batchTotal = importBatchTotal,
+    )
+
+    fun startImports(uris: List<Uri>) {
+        val unique = uris.distinct()
+        if (unique.isEmpty()) return
+        if (!importRunning) {
+            importBatchTotal = unique.size
+            importBatchDone = 0
+        } else {
+            importBatchTotal += unique.size
+        }
+        importQueue.addAll(unique)
+        processNextImport()
+    }
+
+    fun startImport(uri: Uri) = startImports(listOf(uri))
+
+    private fun processNextImport() {
+        if (importRunning) return
+        val next = importQueue.removeFirstOrNull() ?: return
+        importRunning = true
+        importBatchDone += 1
+        importSingle(next) {
+            importRunning = false
+            processNextImport()
+        }
+    }
+
+    private fun importSingle(uri: Uri, onDone: () -> Unit) {
         val mime = app.contentResolver.getType(uri).orEmpty().lowercase()
         val extension = (uri.lastPathSegment.orEmpty().substringAfterLast('.', "")).lowercase()
         if (
@@ -292,12 +337,10 @@ class RecorderViewModel(
             mime.contains("wordprocessingml.document") ||
             extension in setOf("pdf", "docx", "txt", "md", "markdown")
         ) {
-            startDocumentImport(uri)
+            startDocumentImport(uri, onDone)
             return
         }
-        val current = state.value.importState
-        if (current?.stage == ImportStage.PREPARING || current?.stage == ImportStage.UPLOADING || current?.stage == ImportStage.PROCESSING) return
-        _state.update { it.copy(importState = ImportUiState(ImportStage.PREPARING, message = "Готовим аудио…")) }
+        _state.update { it.copy(importState = importUi(ImportStage.PREPARING, message = "Готовим аудио…")) }
         viewModelScope.launch {
             var preparedFile: File? = null
             try {
@@ -307,7 +350,7 @@ class RecorderViewModel(
                     throw IllegalStateException("Лекция длиннее 120 минут")
                 }
                 _state.update {
-                    it.copy(importState = ImportUiState(ImportStage.UPLOADING, prepared.fileName, "Загружаем в облако…"))
+                    it.copy(importState = importUi(ImportStage.UPLOADING, prepared.fileName, "Загружаем в облако…"))
                 }
                 val sessionId = java.util.UUID.randomUUID().toString()
                 val chunkId = java.util.UUID.randomUUID().toString()
@@ -339,7 +382,7 @@ class RecorderViewModel(
                 prepared.file.delete()
                 preparedFile = null
                 _state.update {
-                    it.copy(importState = ImportUiState(ImportStage.PROCESSING, prepared.fileName, "Распознаём и готовим конспект…", sessionId))
+                    it.copy(importState = importUi(ImportStage.PROCESSING, prepared.fileName, "Распознаём и готовим конспект…", sessionId))
                 }
                 var attempts = 0
                 var finalStatus = ""
@@ -360,41 +403,40 @@ class RecorderViewModel(
                 }
                 when {
                     finalStatus == "completed" -> {
-                        _state.update { it.copy(importState = ImportUiState(ImportStage.READY, prepared.fileName, "Конспект готов", sessionId)) }
+                        _state.update { it.copy(importState = importUi(ImportStage.READY, prepared.fileName, "Конспект готов", sessionId)) }
                         refreshUsage()
                     }
                     finalStatus == "failed" -> {
-                        _state.update { it.copy(importState = ImportUiState(ImportStage.ERROR, prepared.fileName, finalError.ifBlank { "Не удалось подготовить конспект" })) }
+                        _state.update { it.copy(importState = importUi(ImportStage.ERROR, prepared.fileName, finalError.ifBlank { "Не удалось подготовить конспект" })) }
                     }
                     lastFailure?.status == 422 -> {
                         api.deleteAudioSession(sessionId)
-                        _state.update { it.copy(importState = ImportUiState(ImportStage.ERROR, prepared.fileName, "Слишком короткая запись — удалена")) }
+                        _state.update { it.copy(importState = importUi(ImportStage.ERROR, prepared.fileName, "Слишком короткая запись — удалена")) }
                     }
                     else -> {
-                        _state.update { it.copy(importState = ImportUiState(ImportStage.PROCESSING, prepared.fileName, "Конспект обрабатывается в фоне", sessionId)) }
+                        _state.update { it.copy(importState = importUi(ImportStage.PROCESSING, prepared.fileName, "Конспект обрабатывается в фоне", sessionId)) }
                     }
                 }
             } catch (exception: Exception) {
                 _state.update {
-                    it.copy(importState = ImportUiState(ImportStage.ERROR, preparedFile?.name.orEmpty(), exception.message ?: "Не удалось импортировать файл"))
+                    it.copy(importState = importUi(ImportStage.ERROR, preparedFile?.name.orEmpty(), exception.message ?: "Не удалось импортировать файл"))
                 }
             } finally {
                 preparedFile?.delete()
+                onDone()
             }
         }
     }
 
-    private fun startDocumentImport(uri: Uri) {
-        val current = state.value.importState
-        if (current?.stage == ImportStage.PREPARING || current?.stage == ImportStage.UPLOADING || current?.stage == ImportStage.PROCESSING) return
-        _state.update { it.copy(importState = ImportUiState(ImportStage.PREPARING, message = "Готовим документ…")) }
+    private fun startDocumentImport(uri: Uri, onDone: () -> Unit = {}) {
+        _state.update { it.copy(importState = importUi(ImportStage.PREPARING, message = "Готовим документ…")) }
         viewModelScope.launch {
             var preparedFile: File? = null
             try {
                 val prepared = DocumentImportExtractor.prepare(app, uri).getOrElse { throw it }
                 preparedFile = prepared.file
                 _state.update {
-                    it.copy(importState = ImportUiState(ImportStage.UPLOADING, prepared.fileName, "Загружаем документ в облако…"))
+                    it.copy(importState = importUi(ImportStage.UPLOADING, prepared.fileName, "Загружаем документ в облако…"))
                 }
                 val target = when (val result = api.initiateDocumentUpload(prepared.fileName, prepared.mimeType, prepared.file.length())) {
                     is ApiResult.Ok -> result.value
@@ -415,21 +457,22 @@ class RecorderViewModel(
                 prepared.file.delete()
                 preparedFile = null
                 _state.update {
-                    it.copy(importState = ImportUiState(ImportStage.PROCESSING, prepared.fileName, "Извлекаем текст и готовим конспект…"))
+                    it.copy(importState = importUi(ImportStage.PROCESSING, prepared.fileName, "Извлекаем текст и готовим конспект…"))
                 }
                 when (val conspect = api.createDocumentConspect(materialFileId)) {
                     is ApiResult.Ok -> {
-                        _state.update { it.copy(importState = ImportUiState(ImportStage.READY, prepared.fileName, "Конспект документа готов", materialFileId)) }
+                        _state.update { it.copy(importState = importUi(ImportStage.READY, prepared.fileName, "Конспект документа готов", materialFileId)) }
                         refreshUsage()
                     }
                     is ApiResult.Failure -> throw IllegalStateException(conspect.message)
                 }
             } catch (exception: Exception) {
                 _state.update {
-                    it.copy(importState = ImportUiState(ImportStage.ERROR, preparedFile?.name.orEmpty(), exception.message ?: "Не удалось импортировать документ"))
+                    it.copy(importState = importUi(ImportStage.ERROR, preparedFile?.name.orEmpty(), exception.message ?: "Не удалось импортировать документ"))
                 }
             } finally {
                 preparedFile?.delete()
+                onDone()
             }
         }
     }

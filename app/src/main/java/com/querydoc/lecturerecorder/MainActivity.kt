@@ -109,9 +109,9 @@ class MainActivity : ComponentActivity() {
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
             var readerMarkdown by rememberSaveable { mutableStateOf<String?>(null) }
             var readerSourceType by rememberSaveable { mutableStateOf("") }
-            val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-                if (uri != null) {
-                    viewModel.startImport(uri)
+            val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+                if (uris.isNotEmpty()) {
+                    viewModel.startImports(uris)
                     showSettings = false
                     showPlans = false
                     showConspects = false

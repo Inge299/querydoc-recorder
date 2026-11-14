@@ -1127,7 +1127,11 @@ private fun ImportProgressCard(
             modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text("Импорт лекции", style = MaterialTheme.typography.labelMedium, color = Color(0xFF475569))
+            Text(
+                if (state.batchTotal > 1) "Импорт лекций · ${state.batchIndex} из ${state.batchTotal}" else "Импорт лекции",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF475569),
+            )
             if (state.fileName.isNotBlank()) {
                 Text(state.fileName, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A), maxLines = 1)
             }
