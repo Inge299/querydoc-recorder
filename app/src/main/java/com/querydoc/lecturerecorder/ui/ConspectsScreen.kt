@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.rememberScrollState
@@ -104,6 +105,8 @@ fun ConspectsScreen(
     var subjects by remember { mutableStateOf<List<SubjectSummary>>(emptyList()) }
     var showSubjectsManager by remember { mutableStateOf(false) }
     var expandedSubjects by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var pendingScrollSubject by remember { mutableStateOf<String?>(null) }
+    val listState = rememberLazyListState()
     var deleting by remember { mutableStateOf(false) }
     var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
     val conspectPrefs = remember { context.getSharedPreferences("conspect_prefs", android.content.Context.MODE_PRIVATE) }
@@ -275,7 +278,18 @@ fun ConspectsScreen(
                     }
                     ReviewQueueItem(subject, unseen, deadline?.daysUntil())
                 }.sortedWith(compareBy({ it.examDays == null }, { it.examDays ?: Long.MAX_VALUE }, { -it.unseen })).take(3)
+                LaunchedEffect(pendingScrollSubject, expandedSubjects, reviewItems) {
+                    val target = pendingScrollSubject ?: return@LaunchedEffect
+                    var targetIndex = if (reviewItems.isNotEmpty()) 1 else 0
+                    for ((name, rows) in subjectGroups) {
+                        if (name == target) break
+                        targetIndex += 1 + if (name in expandedSubjects) rows.size else 0
+                    }
+                    listState.animateScrollToItem(targetIndex)
+                    pendingScrollSubject = null
+                }
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -284,7 +298,10 @@ fun ConspectsScreen(
                         item(key = "review_queue") {
                             ReviewQueueCard(
                                 items = reviewItems,
-                                onOpenSubject = { subject -> expandedSubjects = expandedSubjects + subject },
+                                onOpenSubject = { subject ->
+                                    expandedSubjects = expandedSubjects + subject
+                                    pendingScrollSubject = subject
+                                },
                             )
                         }
                     }
