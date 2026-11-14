@@ -669,12 +669,12 @@ private fun ConspectRow(
         ) {
             Box(
                 modifier = Modifier
-                    .size(46.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
                     .background(Brush.linearGradient(listOf(Color(0xFF4338CA), Color(0xFF7C6AE8)))),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(Icons.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(23.dp))
+                Icon(Icons.Filled.MenuBook, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp))
             }
             Column(modifier = Modifier.weight(1f)) {
                 Row(
