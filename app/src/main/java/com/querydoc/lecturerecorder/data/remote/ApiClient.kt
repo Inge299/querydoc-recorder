@@ -209,6 +209,22 @@ data class StudyKit(
     val cached: Boolean = false,
 )
 
+data class QuizQuestion(
+    val id: String,
+    val question: String,
+    val options: List<String>,
+    val correctIndex: Int,
+    val explanation: String,
+    val sourceQuote: String,
+    val conspectTitle: String,
+)
+
+data class SubjectQuiz(
+    val subjectName: String,
+    val questions: List<QuizQuestion>,
+    val cached: Boolean,
+)
+
 data class LectureAnswer(
     val answer: String,
     val citations: List<LectureCitation>,
@@ -1057,6 +1073,54 @@ class ApiClient(context: Context) {
         response.use { response ->
             if (response.isSuccessful) ApiResult.Ok(Unit)
             else ApiResult.Failure(response.code, "", "Не удалось удалить предмет", false)
+        }
+    }
+
+    suspend fun subjectQuiz(subjectId: String, refresh: Boolean = false): ApiResult<SubjectQuiz> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/subjects/quiz")
+            .post(JSONObject().put("subjectId", subjectId).put("refresh", refresh).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось подготовить проверку" },
+                    response.code >= 500,
+                )
+            }
+            val array = json.optJSONArray("questions") ?: JSONArray()
+            val questions = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                val optionArray = item.optJSONArray("options") ?: JSONArray()
+                val options = (0 until optionArray.length()).map { optionArray.optString(it) }.filter { it.isNotBlank() }
+                val question = item.optString("question").trim()
+                val correctIndex = item.optInt("correctIndex", -1)
+                if (question.isBlank() || options.size != 4 || correctIndex !in 0..3) return@mapNotNull null
+                QuizQuestion(
+                    id = item.optString("id", "q$index"),
+                    question = question,
+                    options = options,
+                    correctIndex = correctIndex,
+                    explanation = item.optString("explanation"),
+                    sourceQuote = item.optString("sourceQuote"),
+                    conspectTitle = item.optString("conspectTitle"),
+                )
+            }
+            if (questions.isEmpty()) {
+                return@use ApiResult.Failure(response.code, "empty_quiz", "Не удалось подготовить вопросы", false)
+            }
+            ApiResult.Ok(
+                SubjectQuiz(
+                    subjectName = json.optString("subjectName"),
+                    questions = questions,
+                    cached = json.optBoolean("cached"),
+                ),
+            )
         }
     }
 
