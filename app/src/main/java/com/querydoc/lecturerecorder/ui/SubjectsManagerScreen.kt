@@ -51,6 +51,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.SubjectSummary
 import com.querydoc.lecturerecorder.data.remote.ConspectSummary
+import com.querydoc.lecturerecorder.data.remote.ServerQuizStats
 import com.querydoc.lecturerecorder.study.StudyPlanStore
 import com.querydoc.lecturerecorder.study.SubjectDeadline
 import com.querydoc.lecturerecorder.study.SubjectQuizStore
@@ -87,6 +88,7 @@ fun SubjectsManagerScreen(
         )
     }
     var deadlines by remember { mutableStateOf<Map<String, SubjectDeadline>>(emptyMap()) }
+    var serverQuizStats by remember { mutableStateOf<Map<String, ServerQuizStats>>(emptyMap()) }
     val scope = rememberCoroutineScope()
 
     fun rowsFor(subject: SubjectSummary): List<ConspectSummary> =
@@ -171,6 +173,10 @@ fun SubjectsManagerScreen(
                 is ApiResult.Ok -> conspects = result.value
                 is ApiResult.Failure -> Unit
             }
+            when (val result = api.subjectQuizStats()) {
+                is ApiResult.Ok -> serverQuizStats = result.value.associateBy { it.subjectId }
+                is ApiResult.Failure -> Unit
+            }
             loading = false
             refreshDeadlines()
         }
@@ -186,7 +192,7 @@ fun SubjectsManagerScreen(
             onFinished = {
                 quizSubject = null
                 onChanged()
-                refreshDeadlines()
+                load()
             },
         )
         return
@@ -321,10 +327,24 @@ fun SubjectsManagerScreen(
                                         else -> Color(0xFF4338CA)
                                     },
                                 )
-                                val quizStats = SubjectQuizStore.stats(context, subject.id)
-                                if (quizStats.attempts > 0) {
+                                val localQuizStats = SubjectQuizStore.stats(context, subject.id)
+                                val remoteQuizStats = serverQuizStats[subject.id]
+                                if (remoteQuizStats != null && remoteQuizStats.attempts > 0) {
                                     Text(
-                                        "Проверки: ${quizStats.attempts} ответов · точность ${quizStats.accuracy}% · готовность: ${SubjectQuizStore.readiness(quizStats)}",
+                                        "Проверки: ${remoteQuizStats.attempts} ответов · точность ${remoteQuizStats.accuracy}% · готовность: ${remoteQuizStats.readiness}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color(0xFF475569),
+                                    )
+                                    if (remoteQuizStats.weakTopics.isNotEmpty()) {
+                                        Text(
+                                            "Слабые темы: ${remoteQuizStats.weakTopics.joinToString(", ")}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = Color(0xFFB45309),
+                                        )
+                                    }
+                                } else if (localQuizStats.attempts > 0) {
+                                    Text(
+                                        "Проверки: ${localQuizStats.attempts} ответов · точность ${localQuizStats.accuracy}% · готовность: ${SubjectQuizStore.readiness(localQuizStats)}",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = Color(0xFF475569),
                                     )

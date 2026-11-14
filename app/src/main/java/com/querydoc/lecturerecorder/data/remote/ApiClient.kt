@@ -225,6 +225,19 @@ data class SubjectQuiz(
     val cached: Boolean,
 )
 
+data class ServerQuizStats(
+    val subjectId: String,
+    val subjectName: String,
+    val attempts: Int,
+    val correct: Int,
+    val distinctQuestions: Int,
+    val bankSize: Int,
+    val accuracy: Int,
+    val coverage: Int,
+    val readiness: String,
+    val weakTopics: List<String>,
+)
+
 data class LectureAnswer(
     val answer: String,
     val citations: List<LectureCitation>,
@@ -1121,6 +1134,56 @@ class ApiClient(context: Context) {
                     cached = json.optBoolean("cached"),
                 ),
             )
+        }
+    }
+
+    suspend fun subjectQuizStats(): ApiResult<List<ServerQuizStats>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/subjects/quiz/stats").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось получить статистику", response.code >= 500)
+            }
+            val array = json.optJSONArray("subjects") ?: JSONArray()
+            val rows = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                val topics = item.optJSONArray("weakTopics")
+                ServerQuizStats(
+                    subjectId = item.optString("subjectId"),
+                    subjectName = item.optString("subjectName"),
+                    attempts = item.optInt("attempts"),
+                    correct = item.optInt("correct"),
+                    distinctQuestions = item.optInt("distinctQuestions"),
+                    bankSize = item.optInt("bankSize"),
+                    accuracy = item.optInt("accuracy"),
+                    coverage = item.optInt("coverage"),
+                    readiness = item.optString("readiness"),
+                    weakTopics = if (topics == null) emptyList() else (0 until topics.length()).map { topics.optString(it) }.filter { it.isNotBlank() },
+                )
+            }
+            ApiResult.Ok(rows)
+        }
+    }
+
+    suspend fun recordQuizAttempt(subjectId: String, questionId: String, selectedIndex: Int): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/subjects/quiz/attempt")
+            .post(
+                JSONObject()
+                    .put("subjectId", subjectId)
+                    .put("questionId", questionId)
+                    .put("selectedIndex", selectedIndex)
+                    .toString()
+                    .toRequestBody(JSON),
+            )
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", "Не удалось сохранить ответ", response.code >= 500)
         }
     }
 

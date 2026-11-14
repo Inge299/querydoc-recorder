@@ -197,6 +197,9 @@ fun SubjectQuizScreen(
                                 val correct = selected == question.correctIndex
                                 if (correct) correctCount += 1
                                 SubjectQuizStore.record(context, subject.id, question.id + ":" + question.question.take(40), correct, total, question.conspectTitle)
+                                scope.launch {
+                                    api.recordQuizAttempt(subject.id, question.id, selected)
+                                }
                                 submitted = true
                             } else if (index + 1 >= total) {
                                 finished = true
