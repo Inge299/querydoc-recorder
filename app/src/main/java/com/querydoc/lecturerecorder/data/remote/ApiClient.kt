@@ -1124,6 +1124,34 @@ class ApiClient(context: Context) {
         }
     }
 
+    suspend fun reportQuizQuestion(subjectId: String, questionId: String, reason: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/subjects/quiz/report")
+            .post(
+                JSONObject()
+                    .put("subjectId", subjectId)
+                    .put("questionId", questionId)
+                    .put("reason", reason.take(500))
+                    .toString()
+                    .toRequestBody(JSON),
+            )
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else {
+                val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+                ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось отправить жалобу" },
+                    response.code >= 500,
+                )
+            }
+        }
+    }
+
     suspend fun supportMessages(): ApiResult<SupportPayload> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val request = Request.Builder().url("$baseUrl/api/v1/mobile/support").get().build()

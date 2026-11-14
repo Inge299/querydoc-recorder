@@ -34,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +47,7 @@ import com.querydoc.lecturerecorder.data.remote.QuizQuestion
 import com.querydoc.lecturerecorder.data.remote.SubjectQuiz
 import com.querydoc.lecturerecorder.data.remote.SubjectSummary
 import com.querydoc.lecturerecorder.study.SubjectQuizStore
+import kotlinx.coroutines.launch
 
 @Composable
 fun SubjectQuizScreen(
@@ -65,6 +67,8 @@ fun SubjectQuizScreen(
     var finished by remember(subject.id) { mutableStateOf(false) }
     var retry by remember(subject.id) { mutableIntStateOf(0) }
     var regenerate by remember(subject.id) { mutableStateOf(false) }
+    var reportState by remember(subject.id) { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(subject.id, retry) {
         loading = true
@@ -78,6 +82,7 @@ fun SubjectQuizScreen(
                 submitted = false
                 correctCount = 0
                 finished = false
+                reportState = ""
                 SubjectQuizStore.setBankSize(context, subject.id, result.value.questions.size)
             }
             is ApiResult.Failure -> error = result.message
@@ -115,6 +120,10 @@ fun SubjectQuizScreen(
                     Text("Правильно: $correctCount из $total", style = MaterialTheme.typography.titleMedium, color = androidx.compose.ui.graphics.Color(0xFF4338CA))
                     Text("Точность: $accuracy%", style = MaterialTheme.typography.bodyLarge, color = androidx.compose.ui.graphics.Color(0xFF334155))
                     Text("Результат сохранён в прогрессе предмета.", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFF64748B))
+                    val stats = SubjectQuizStore.stats(context, subject.id)
+                    if (stats.weakTopics.isNotEmpty()) {
+                        Text("Слабые темы: ${stats.weakTopics.joinToString(", ")}", style = MaterialTheme.typography.bodySmall, color = androidx.compose.ui.graphics.Color(0xFFB45309))
+                    }
                     Button(onClick = onFinished, modifier = Modifier.fillMaxWidth()) { Text("К предметам") }
                     TextButton(onClick = {
                         regenerate = true
@@ -165,6 +174,19 @@ fun SubjectQuizScreen(
                         if (question.sourceQuote.isNotBlank()) {
                             Text("Из конспекта: «${question.sourceQuote}»", style = MaterialTheme.typography.labelSmall, color = androidx.compose.ui.graphics.Color(0xFF64748B), modifier = Modifier.padding(top = 6.dp))
                         }
+                        TextButton(
+                            onClick = {
+                                if (reportState.isBlank()) {
+                                    scope.launch {
+                                        reportState = when (val result = api.reportQuizQuestion(subject.id, question.id, "Некорректный или неоднозначный вопрос")) {
+                                            is ApiResult.Ok -> "Спасибо, вопрос отправлен на проверку."
+                                            is ApiResult.Failure -> result.message
+                                        }
+                                    }
+                                }
+                            },
+                            modifier = Modifier.padding(0.dp),
+                        ) { Text(if (reportState.isBlank()) "Вопрос некорректный?" else reportState, style = MaterialTheme.typography.labelSmall) }
                     }
                     Button(
                         onClick = {
@@ -172,7 +194,7 @@ fun SubjectQuizScreen(
                                 if (selected < 0) return@Button
                                 val correct = selected == question.correctIndex
                                 if (correct) correctCount += 1
-                                SubjectQuizStore.record(context, subject.id, question.id + ":" + question.question.take(40), correct, total)
+                                SubjectQuizStore.record(context, subject.id, question.id + ":" + question.question.take(40), correct, total, question.conspectTitle)
                                 submitted = true
                             } else if (index + 1 >= total) {
                                 finished = true
@@ -180,6 +202,7 @@ fun SubjectQuizScreen(
                                 index += 1
                                 selected = -1
                                 submitted = false
+                                reportState = ""
                             }
                         },
                         enabled = submitted || selected >= 0,

@@ -9,6 +9,7 @@ data class SubjectQuizStats(
     val correct: Int,
     val distinctQuestions: Int,
     val bankSize: Int,
+    val weakTopics: List<String> = emptyList(),
 ) {
     val accuracy: Int
         get() = if (attempts > 0) (correct * 100 / attempts) else 0
@@ -27,6 +28,9 @@ object SubjectQuizStore {
             correct = item?.optInt("correct", 0) ?: 0,
             distinctQuestions = item?.optJSONArray("questions")?.length() ?: 0,
             bankSize = item?.optInt("bankSize", 0) ?: 0,
+            weakTopics = item?.optJSONObject("weak")?.let { weak ->
+                weak.keys().asSequence().sortedByDescending { weak.optInt(it, 0) }.take(3).toList()
+            } ?: emptyList(),
         )
     }
 
@@ -39,7 +43,7 @@ object SubjectQuizStore {
         write(context, root)
     }
 
-    fun record(context: Context, subjectId: String, questionKey: String, correct: Boolean, bankSize: Int) {
+    fun record(context: Context, subjectId: String, questionKey: String, correct: Boolean, bankSize: Int, conspectTitle: String = "") {
         if (subjectId.isBlank() || questionKey.isBlank()) return
         val root = read(context)
         val item = root.optJSONObject(subjectId) ?: JSONObject()
@@ -52,6 +56,11 @@ object SubjectQuizStore {
             val updated = JSONArray()
             known.sorted().forEach { updated.put(it) }
             item.put("questions", updated)
+        }
+        if (!correct && conspectTitle.isNotBlank()) {
+            val weak = item.optJSONObject("weak") ?: JSONObject()
+            weak.put(conspectTitle, weak.optInt(conspectTitle, 0) + 1)
+            item.put("weak", weak)
         }
         root.put(subjectId, item)
         write(context, root)
