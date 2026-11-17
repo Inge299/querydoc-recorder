@@ -125,7 +125,7 @@ fun GroupLibraryReaderScreen(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text("Конспект группы", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
-                Text(item.subject.ifBlank { "Без предмета" }, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                Text(item.groupSubjectName.ifBlank { item.subject.ifBlank { "Без предмета" } }, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
             }
         }
         Column(

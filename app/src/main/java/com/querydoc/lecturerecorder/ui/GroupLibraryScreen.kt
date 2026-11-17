@@ -46,6 +46,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectSummary
 import com.querydoc.lecturerecorder.data.remote.GroupLibraryItem
+import com.querydoc.lecturerecorder.data.remote.GroupSubjectSummary
 import com.querydoc.lecturerecorder.data.remote.StudyGroupSummary
 import kotlinx.coroutines.launch
 
@@ -60,6 +61,8 @@ fun GroupLibraryScreen(
     var error by remember { mutableStateOf("") }
     var showShare by remember { mutableStateOf(false) }
     var conspects by remember { mutableStateOf<List<ConspectSummary>>(emptyList()) }
+    var groupSubjects by remember { mutableStateOf<List<GroupSubjectSummary>>(emptyList()) }
+    var selectedGroupSubjectId by remember { mutableStateOf("") }
     var shareBusy by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf("") }
     var selectedItem by remember { mutableStateOf<GroupLibraryItem?>(null) }
@@ -84,6 +87,13 @@ fun GroupLibraryScreen(
             when (val result = api.listConspects()) {
                 is ApiResult.Ok -> conspects = result.value
                 is ApiResult.Failure -> error = result.message
+            }
+            when (val result = api.groupSubjects(group.id)) {
+                is ApiResult.Ok -> {
+                    groupSubjects = result.value
+                    if (selectedGroupSubjectId.isBlank()) selectedGroupSubjectId = result.value.firstOrNull()?.id.orEmpty()
+                }
+                is ApiResult.Failure -> Unit
             }
         }
     }
@@ -151,7 +161,7 @@ fun GroupLibraryScreen(
                         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(item.title.ifBlank { "Конспект" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
-                                Text(item.subject.ifBlank { "Без предмета" }, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                                Text(item.groupSubjectName.ifBlank { item.subject.ifBlank { "Без предмета" } }, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
                                 if (item.timeline.isNotEmpty()) {
                                     Text("Таймкоды: ${item.timeline.size}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF4338CA))
                                 }
@@ -185,13 +195,27 @@ fun GroupLibraryScreen(
             text = {
                 Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
                     Text("Будет добавлена групповая копия. Личный конспект останется у вас.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
+                    if (groupSubjects.isNotEmpty()) {
+                        Text("Предмет группы", style = MaterialTheme.typography.labelMedium, color = Color(0xFF475569), modifier = Modifier.padding(top = 10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 6.dp)) {
+                            groupSubjects.forEach { subject ->
+                                TextButton(onClick = { selectedGroupSubjectId = subject.id }) {
+                                    Text(
+                                        subject.name,
+                                        color = if (selectedGroupSubjectId == subject.id) Color(0xFF4338CA) else Color(0xFF64748B),
+                                        fontWeight = if (selectedGroupSubjectId == subject.id) FontWeight.SemiBold else FontWeight.Normal,
+                                    )
+                                }
+                            }
+                        }
+                    }
                     conspects.forEach { conspect ->
                         TextButton(
                             enabled = !shareBusy,
                             onClick = {
                                 shareBusy = true
                                 scope.launch {
-                                    when (val result = api.shareConspectToGroup(group.id, conspect.sessionId)) {
+                                    when (val result = api.shareConspectToGroup(group.id, conspect.sessionId, selectedGroupSubjectId)) {
                                         is ApiResult.Ok -> {
                                             showShare = false
                                             actionMessage = "Конспект добавлен в библиотеку группы"

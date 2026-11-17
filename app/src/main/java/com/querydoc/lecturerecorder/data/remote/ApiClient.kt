@@ -252,10 +252,18 @@ data class GroupTimelineEntry(
     val text: String,
 )
 
+data class GroupSubjectSummary(
+    val id: String,
+    val name: String,
+    val teacherName: String,
+)
+
 data class GroupLibraryItem(
     val id: String,
     val title: String,
     val subject: String,
+    val groupSubjectId: String,
+    val groupSubjectName: String,
     val addedByUserId: String,
     val sourceSessionId: String,
     val markdownSnapshot: String,
@@ -1188,6 +1196,8 @@ class ApiClient(context: Context) {
                     id = item.optString("id"),
                     title = item.optString("title"),
                     subject = item.optString("subject"),
+                    groupSubjectId = item.optString("groupSubjectId"),
+                    groupSubjectName = item.optString("groupSubjectName"),
                     addedByUserId = item.optString("addedByUserId"),
                     sourceSessionId = item.optString("sourceSessionId"),
                     markdownSnapshot = item.optString("markdownSnapshot"),
@@ -1206,11 +1216,33 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun shareConspectToGroup(groupId: String, conspectId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    suspend fun groupSubjects(groupId: String): ApiResult<List<GroupSubjectSummary>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/groups/$groupId/subjects").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось загрузить предметы", response.code >= 500)
+            }
+            val array = json.optJSONArray("subjects") ?: JSONArray()
+            val subjects = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                GroupSubjectSummary(
+                    id = item.optString("id"),
+                    name = item.optString("name"),
+                    teacherName = item.optString("teacherName"),
+                )
+            }
+            ApiResult.Ok(subjects)
+        }
+    }
+
+    suspend fun shareConspectToGroup(groupId: String, conspectId: String, groupSubjectId: String = ""): ApiResult<Unit> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/groups/$groupId/library")
-            .post(JSONObject().put("conspectId", conspectId).toString().toRequestBody(JSON))
+            .post(JSONObject().put("conspectId", conspectId).put("groupSubjectId", groupSubjectId).toString().toRequestBody(JSON))
             .build()
         val response = execute(request) ?: return@withContext networkFailure()
         response.use { response ->
