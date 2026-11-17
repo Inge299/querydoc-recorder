@@ -92,6 +92,7 @@ fun SettingsScreen(
     onOpenPlans: () -> Unit,
     onOpenNotifications: () -> Unit,
     onOpenSupport: () -> Unit,
+    onOpenGroup: (StudyGroupSummary) -> Unit,
     onDeleteAccount: (String, (Boolean, String) -> Unit) -> Unit,
     onBack: () -> Unit,
 ) {
@@ -258,7 +259,7 @@ fun SettingsScreen(
                         icon = Icons.Filled.Group,
                         title = group.name,
                         subtitle = if (group.role == "owner") "Вы преподаватель · ${group.memberCount} студентов" else "Участник · ${group.memberCount} студентов",
-                        onClick = {},
+                        onClick = { onOpenGroup(group) },
                     )
                     SettingDivider()
                 }

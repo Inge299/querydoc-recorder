@@ -33,10 +33,12 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.view.WindowCompat
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
+import com.querydoc.lecturerecorder.data.remote.StudyGroupSummary
 import com.querydoc.lecturerecorder.diagnostics.Analytics
 import com.querydoc.lecturerecorder.diagnostics.CrashReporter
 import com.querydoc.lecturerecorder.media.FolderImport
 import com.querydoc.lecturerecorder.ui.ConspectReaderScreen
+import com.querydoc.lecturerecorder.ui.GroupLibraryScreen
 import com.querydoc.lecturerecorder.ui.ConspectsScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LegalScreen
@@ -109,6 +111,7 @@ class MainActivity : ComponentActivity() {
             var showPlans by rememberSaveable { mutableStateOf(false) }
             var showNotifications by rememberSaveable { mutableStateOf(false) }
             var showSupport by rememberSaveable { mutableStateOf(false) }
+            var groupLibraryGroup by remember { mutableStateOf<StudyGroupSummary?>(null) }
             var showImportSource by rememberSaveable { mutableStateOf(false) }
             var unreadNotifications by remember { mutableStateOf(0) }
             var readerSession by rememberSaveable { mutableStateOf<String?>(null) }
@@ -188,6 +191,7 @@ class MainActivity : ComponentActivity() {
                 !loggedIn -> "login"
                 !onboardingDone -> "onboarding"
                 showLegal -> "legal"
+                groupLibraryGroup != null -> "groupLibrary"
                 readerSession != null -> "reader"
                 showPlans -> "plans"
                 showSupport -> "support"
@@ -220,6 +224,9 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showSupport) {
                 showSupport = false
+            }
+            BackHandler(enabled = groupLibraryGroup != null) {
+                groupLibraryGroup = null
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
@@ -349,6 +356,7 @@ class MainActivity : ComponentActivity() {
                                 onOpenPlans = { showPlans = true },
                                 onOpenNotifications = { showNotifications = true },
                                 onOpenSupport = { showSupport = true },
+                                onOpenGroup = { groupLibraryGroup = it },
                                 onDeleteAccount = { password, callback ->
                                     scope.launch {
                                         when (val result = api.deleteAccount(password)) {

@@ -246,6 +246,17 @@ data class StudyGroupSummary(
     val inviteCode: String,
 )
 
+data class GroupLibraryItem(
+    val id: String,
+    val title: String,
+    val subject: String,
+    val addedByUserId: String,
+    val sourceSessionId: String,
+    val markdownSnapshot: String,
+    val timelineCount: Int,
+    val canDelete: Boolean,
+)
+
 data class LectureAnswer(
     val answer: String,
     val citations: List<LectureCitation>,
@@ -1152,6 +1163,61 @@ class ApiClient(context: Context) {
                     cached = json.optBoolean("cached"),
                 ),
             )
+        }
+    }
+
+    suspend fun groupLibrary(groupId: String): ApiResult<List<GroupLibraryItem>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/groups/$groupId/library").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось загрузить библиотеку", response.code >= 500)
+            }
+            val array = json.optJSONArray("items") ?: JSONArray()
+            val items = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                GroupLibraryItem(
+                    id = item.optString("id"),
+                    title = item.optString("title"),
+                    subject = item.optString("subject"),
+                    addedByUserId = item.optString("addedByUserId"),
+                    sourceSessionId = item.optString("sourceSessionId"),
+                    markdownSnapshot = item.optString("markdownSnapshot"),
+                    timelineCount = item.optJSONArray("timeline")?.length() ?: 0,
+                    canDelete = item.optBoolean("canDelete"),
+                )
+            }
+            ApiResult.Ok(items)
+        }
+    }
+
+    suspend fun shareConspectToGroup(groupId: String, conspectId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/groups/$groupId/library")
+            .post(JSONObject().put("conspectId", conspectId).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось добавить конспект" }, response.code >= 500)
+        }
+    }
+
+    suspend fun deleteGroupLibraryItem(groupId: String, itemId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/groups/$groupId/library")
+            .delete(JSONObject().put("itemId", itemId).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else ApiResult.Failure(response.code, "", json?.optString("error").orEmpty().ifBlank { "Не удалось удалить материал" }, response.code >= 500)
         }
     }
 
