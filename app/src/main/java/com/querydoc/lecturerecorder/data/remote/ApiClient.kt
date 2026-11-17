@@ -238,6 +238,14 @@ data class ServerQuizStats(
     val weakTopics: List<String>,
 )
 
+data class StudyGroupSummary(
+    val id: String,
+    val name: String,
+    val role: String,
+    val memberCount: Int,
+    val inviteCode: String,
+)
+
 data class LectureAnswer(
     val answer: String,
     val citations: List<LectureCitation>,
@@ -1142,6 +1150,60 @@ class ApiClient(context: Context) {
                     subjectName = json.optString("subjectName"),
                     questions = questions,
                     cached = json.optBoolean("cached"),
+                ),
+            )
+        }
+    }
+
+    suspend fun listStudyGroups(): ApiResult<List<StudyGroupSummary>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/groups").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось получить группы", response.code >= 500)
+            }
+            val array = json.optJSONArray("groups") ?: JSONArray()
+            val groups = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                StudyGroupSummary(
+                    id = item.optString("id"),
+                    name = item.optString("name"),
+                    role = item.optString("role"),
+                    memberCount = item.optInt("memberCount"),
+                    inviteCode = item.optString("inviteCode"),
+                )
+            }
+            ApiResult.Ok(groups)
+        }
+    }
+
+    suspend fun joinStudyGroup(code: String): ApiResult<StudyGroupSummary> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/groups/join")
+            .post(JSONObject().put("code", code.trim().uppercase()).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val item = json?.optJSONObject("group")
+            if (!response.isSuccessful || item == null) {
+                return@use ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось присоединиться к группе" },
+                    response.code >= 500,
+                )
+            }
+            ApiResult.Ok(
+                StudyGroupSummary(
+                    id = item.optString("id"),
+                    name = item.optString("name"),
+                    role = item.optString("role"),
+                    memberCount = item.optInt("memberCount"),
+                    inviteCode = item.optString("inviteCode"),
                 ),
             )
         }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Mic
@@ -48,6 +49,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -60,7 +62,9 @@ import com.querydoc.lecturerecorder.BuildConfig
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.UsageSummary
+import com.querydoc.lecturerecorder.data.remote.StudyGroupSummary
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
+import kotlinx.coroutines.launch
 
 @Composable
 fun SettingsScreen(
@@ -101,6 +105,12 @@ fun SettingsScreen(
     var clearAudioConfirm by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
+    var groups by remember { mutableStateOf<List<StudyGroupSummary>>(emptyList()) }
+    var showGroupDialog by remember { mutableStateOf(false) }
+    var groupCode by remember { mutableStateOf("") }
+    var groupError by remember { mutableStateOf("") }
+    var groupBusy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     var deleteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
     var deleteBusy by remember { mutableStateOf(false) }
@@ -109,6 +119,10 @@ fun SettingsScreen(
         when (val result = api.usage()) {
             is ApiResult.Ok -> usage = result.value
             is ApiResult.Failure -> usageError = result.message
+        }
+        when (val result = api.listStudyGroups()) {
+            is ApiResult.Ok -> groups = result.value
+            is ApiResult.Failure -> Unit
         }
     }
 
@@ -234,6 +248,29 @@ fun SettingsScreen(
                     title = "Язык лекции",
                     subtitle = recognitionLanguage.label,
                     onClick = { showLanguageDialog = true },
+                    trailing = { Chevron() },
+                )
+            }
+
+            SettingsSection(title = "ГРУППЫ") {
+                groups.forEach { group ->
+                    SettingRow(
+                        icon = Icons.Filled.Group,
+                        title = group.name,
+                        subtitle = if (group.role == "owner") "Вы преподаватель · ${group.memberCount} студентов" else "Участник · ${group.memberCount} студентов",
+                        onClick = {},
+                    )
+                    SettingDivider()
+                }
+                SettingRow(
+                    icon = Icons.Filled.Group,
+                    title = "Присоединиться к группе",
+                    subtitle = "Введите код от преподавателя",
+                    onClick = {
+                        groupCode = ""
+                        groupError = ""
+                        showGroupDialog = true
+                    },
                     trailing = { Chevron() },
                 )
             }
@@ -416,6 +453,53 @@ fun SettingsScreen(
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { logoutConfirm = false }) { Text("Отмена") }
             },
+        )
+    }
+
+    if (showGroupDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!groupBusy) showGroupDialog = false },
+            title = { Text("Присоединиться к группе") },
+            text = {
+                Column {
+                    Text("Введите код, который выдал преподаватель.")
+                    Text(
+                        "Преподаватель увидит количество ваших конспектов и статистику проверок, но не содержимое лекций.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF64748B),
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    androidx.compose.material3.OutlinedTextField(
+                        value = groupCode,
+                        onValueChange = { groupCode = it.uppercase().take(8) },
+                        singleLine = true,
+                        label = { Text("Код группы") },
+                        modifier = Modifier.padding(top = 12.dp),
+                    )
+                    if (groupError.isNotBlank()) {
+                        Text(groupError, color = Color(0xFFB91C1C), style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = groupCode.isNotBlank() && !groupBusy,
+                    onClick = {
+                        groupBusy = true
+                        scope.launch {
+                            when (val result = api.joinStudyGroup(groupCode)) {
+                                is ApiResult.Ok -> {
+                                    groups = (groups + result.value).distinctBy { it.id }
+                                    showGroupDialog = false
+                                }
+                                is ApiResult.Failure -> groupError = result.message
+                            }
+                            groupBusy = false
+                        }
+                    },
+                ) { Text(if (groupBusy) "Входим…" else "Войти") }
+            },
+            dismissButton = { TextButton(enabled = !groupBusy, onClick = { showGroupDialog = false }) { Text("Отмена") } },
         )
     }
 
