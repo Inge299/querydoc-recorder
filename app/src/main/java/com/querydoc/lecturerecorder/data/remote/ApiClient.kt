@@ -246,6 +246,12 @@ data class StudyGroupSummary(
     val inviteCode: String,
 )
 
+data class GroupTimelineEntry(
+    val startMs: Long,
+    val endMs: Long,
+    val text: String,
+)
+
 data class GroupLibraryItem(
     val id: String,
     val title: String,
@@ -253,7 +259,7 @@ data class GroupLibraryItem(
     val addedByUserId: String,
     val sourceSessionId: String,
     val markdownSnapshot: String,
-    val timelineCount: Int,
+    val timeline: List<GroupTimelineEntry>,
     val canDelete: Boolean,
 )
 
@@ -1185,7 +1191,14 @@ class ApiClient(context: Context) {
                     addedByUserId = item.optString("addedByUserId"),
                     sourceSessionId = item.optString("sourceSessionId"),
                     markdownSnapshot = item.optString("markdownSnapshot"),
-                    timelineCount = item.optJSONArray("timeline")?.length() ?: 0,
+                    timeline = (0 until (item.optJSONArray("timeline")?.length() ?: 0)).mapNotNull { timelineIndex ->
+                        val entry = item.optJSONArray("timeline")?.optJSONObject(timelineIndex) ?: return@mapNotNull null
+                        GroupTimelineEntry(
+                            startMs = entry.optLong("startMs"),
+                            endMs = entry.optLong("endMs"),
+                            text = entry.optString("text"),
+                        )
+                    },
                     canDelete = item.optBoolean("canDelete"),
                 )
             }

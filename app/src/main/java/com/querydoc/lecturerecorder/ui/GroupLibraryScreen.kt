@@ -91,7 +91,7 @@ fun GroupLibraryScreen(
     LaunchedEffect(group.id) { load() }
     val activeItem = selectedItem
     if (activeItem != null) {
-        GroupLibraryReaderScreen(item = activeItem, onBack = { selectedItem = null })
+        GroupLibraryReaderScreen(api = api, item = activeItem, onBack = { selectedItem = null })
         return
     }
     BackHandler { onBack() }
@@ -152,8 +152,8 @@ fun GroupLibraryScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(item.title.ifBlank { "Конспект" }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = Color(0xFF0F172A))
                                 Text(item.subject.ifBlank { "Без предмета" }, style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B))
-                                if (item.timelineCount > 0) {
-                                    Text("Таймкоды: ${item.timelineCount}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF4338CA))
+                                if (item.timeline.isNotEmpty()) {
+                                    Text("Таймкоды: ${item.timeline.size}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF4338CA))
                                 }
                             }
                             if (group.role == "owner" && item.canDelete) {
