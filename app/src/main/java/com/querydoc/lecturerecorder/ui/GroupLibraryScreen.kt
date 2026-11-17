@@ -62,6 +62,7 @@ fun GroupLibraryScreen(
     var conspects by remember { mutableStateOf<List<ConspectSummary>>(emptyList()) }
     var shareBusy by remember { mutableStateOf(false) }
     var actionMessage by remember { mutableStateOf("") }
+    var selectedItem by remember { mutableStateOf<GroupLibraryItem?>(null) }
     val scope = rememberCoroutineScope()
 
     fun load() {
@@ -88,6 +89,11 @@ fun GroupLibraryScreen(
     }
 
     LaunchedEffect(group.id) { load() }
+    val activeItem = selectedItem
+    if (activeItem != null) {
+        GroupLibraryReaderScreen(item = activeItem, onBack = { selectedItem = null })
+        return
+    }
     BackHandler { onBack() }
 
     Column(
@@ -138,7 +144,7 @@ fun GroupLibraryScreen(
             ) {
                 items.forEach { item ->
                     Card(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().clickable { selectedItem = item },
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.White),
                     ) {
