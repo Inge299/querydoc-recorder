@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.DeleteForever
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CardDefaults
@@ -41,6 +43,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -63,6 +66,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.UsageSummary
 import com.querydoc.lecturerecorder.data.remote.StudyGroupSummary
+import com.querydoc.lecturerecorder.data.remote.TeacherInviteSummary
 import com.querydoc.lecturerecorder.recording.EnvironmentProfile
 import kotlinx.coroutines.launch
 
@@ -111,6 +115,10 @@ fun SettingsScreen(
     var groupCode by remember { mutableStateOf("") }
     var groupError by remember { mutableStateOf("") }
     var groupBusy by remember { mutableStateOf(false) }
+    var invites by remember { mutableStateOf<List<TeacherInviteSummary>>(emptyList()) }
+    var inviteBusyId by remember { mutableStateOf("") }
+    var inviteError by remember { mutableStateOf("") }
+    var inviteNotice by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     var deleteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
@@ -123,6 +131,10 @@ fun SettingsScreen(
         }
         when (val result = api.listStudyGroups()) {
             is ApiResult.Ok -> groups = result.value
+            is ApiResult.Failure -> Unit
+        }
+        when (val result = api.listTeacherInvites()) {
+            is ApiResult.Ok -> invites = result.value
             is ApiResult.Failure -> Unit
         }
     }
@@ -251,6 +263,70 @@ fun SettingsScreen(
                     onClick = { showLanguageDialog = true },
                     trailing = { Chevron() },
                 )
+            }
+
+            if (invites.isNotEmpty() || inviteNotice.isNotBlank() || inviteError.isNotBlank()) {
+                SettingsSection(title = "ПРИГЛАШЕНИЯ") {
+                    if (inviteError.isNotBlank()) {
+                        Text(
+                            inviteError,
+                            color = Color(0xFFDC2626),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        )
+                        SettingDivider()
+                    }
+                    if (inviteNotice.isNotBlank()) {
+                        Text(
+                            inviteNotice,
+                            color = Color(0xFF047857),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        )
+                        SettingDivider()
+                    }
+                    invites.forEach { invite ->
+                        InviteRow(
+                            invite = invite,
+                            busy = inviteBusyId.isNotEmpty(),
+                            onAccept = {
+                                inviteBusyId = invite.id
+                                inviteError = ""
+                                inviteNotice = ""
+                                scope.launch {
+                                    when (val result = api.acceptTeacherInvite(invite.id)) {
+                                        is ApiResult.Ok -> {
+                                            invites = invites.filterNot { it.id == invite.id }
+                                            inviteNotice = "Вы приняли приглашение: ${invite.subjectName}."
+                                            when (val groupsResult = api.listStudyGroups()) {
+                                                is ApiResult.Ok -> groups = groupsResult.value
+                                                is ApiResult.Failure -> Unit
+                                            }
+                                        }
+                                        is ApiResult.Failure -> inviteError = result.message
+                                    }
+                                    inviteBusyId = ""
+                                }
+                            },
+                            onDecline = {
+                                inviteBusyId = invite.id
+                                inviteError = ""
+                                inviteNotice = ""
+                                scope.launch {
+                                    when (val result = api.declineTeacherInvite(invite.id)) {
+                                        is ApiResult.Ok -> {
+                                            invites = invites.filterNot { it.id == invite.id }
+                                            inviteNotice = "Приглашение отклонено: ${invite.subjectName}."
+                                        }
+                                        is ApiResult.Failure -> inviteError = result.message
+                                    }
+                                    inviteBusyId = ""
+                                }
+                            },
+                        )
+                        SettingDivider()
+                    }
+                }
             }
 
             SettingsSection(title = "ГРУППЫ") {
@@ -651,6 +727,66 @@ private fun ChoiceDialog(
             TextButton(onClick = onDismiss) { Text("Закрыть") }
         },
     )
+}
+
+@Composable
+private fun InviteRow(
+    invite: TeacherInviteSummary,
+    busy: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Icon(
+                Icons.Filled.Email,
+                contentDescription = null,
+                tint = Color(0xFF4338CA),
+                modifier = Modifier.size(22.dp),
+            )
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    invite.subjectName.ifBlank { "Предмет" },
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color(0xFF0F172A),
+                )
+                Text(
+                    listOfNotNull(
+                        invite.groupName.ifBlank { "Группа" },
+                        invite.message.takeIf { it.isNotBlank() },
+                        "приглашение преподавателя",
+                    ).joinToString(" · "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF64748B),
+                )
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(
+                onClick = onAccept,
+                enabled = !busy,
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4338CA)),
+                modifier = Modifier.weight(1f),
+            ) {
+                Text(if (busy) "Подождите…" else "Принять")
+            }
+            OutlinedButton(
+                onClick = onDecline,
+                enabled = !busy,
+                modifier = Modifier.weight(1f),
+            ) {
+                Text("Отклонить")
+            }
+        }
+    }
 }
 
 @Composable

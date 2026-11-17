@@ -246,6 +246,18 @@ data class StudyGroupSummary(
     val inviteCode: String,
 )
 
+data class TeacherInviteSummary(
+    val id: String,
+    val groupId: String,
+    val groupName: String,
+    val subjectId: String,
+    val subjectName: String,
+    val contactMasked: String,
+    val status: String,
+    val expiresAt: String,
+    val message: String,
+)
+
 data class GroupTimelineEntry(
     val startMs: Long,
     val endMs: Long,
@@ -1317,6 +1329,76 @@ class ApiClient(context: Context) {
                     inviteCode = item.optString("inviteCode"),
                 ),
             )
+        }
+    }
+
+    suspend fun listTeacherInvites(): ApiResult<List<TeacherInviteSummary>> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder().url("$baseUrl/api/v1/mobile/teacher-invites").get().build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(response.code, "", "Не удалось загрузить приглашения", response.code >= 500)
+            }
+            val array = json.optJSONArray("invites") ?: JSONArray()
+            val invites = (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                TeacherInviteSummary(
+                    id = item.optString("id"),
+                    groupId = item.optString("groupId"),
+                    groupName = item.optString("groupName"),
+                    subjectId = item.optString("groupSubjectId"),
+                    subjectName = item.optString("groupSubjectName"),
+                    contactMasked = item.optString("contactMasked"),
+                    status = item.optString("status"),
+                    expiresAt = item.optString("expiresAt"),
+                    message = item.optString("message"),
+                )
+            }
+            ApiResult.Ok(invites)
+        }
+    }
+
+    suspend fun acceptTeacherInvite(inviteId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/teacher-invites/$inviteId/accept")
+            .post("{}".toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else {
+                ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось принять приглашение" },
+                    response.code >= 500,
+                )
+            }
+        }
+    }
+
+    suspend fun declineTeacherInvite(inviteId: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/teacher-invites/$inviteId/decline")
+            .post("{}".toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) ApiResult.Ok(Unit)
+            else {
+                ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось отклонить приглашение" },
+                    response.code >= 500,
+                )
+            }
         }
     }
 
