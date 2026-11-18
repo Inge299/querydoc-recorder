@@ -1432,18 +1432,24 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun recordQuizAttempt(subjectId: String, questionId: String, selectedIndex: Int): ApiResult<Unit> = withContext(Dispatchers.IO) {
+    suspend fun recordQuizAttempt(
+        subjectId: String,
+        questionId: String,
+        selectedIndex: Int,
+        groupId: String = "",
+        groupSubjectId: String = "",
+    ): ApiResult<Unit> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject()
+            .put("subjectId", subjectId)
+            .put("questionId", questionId)
+            .put("selectedIndex", selectedIndex)
+        if (groupId.isNotBlank() && groupSubjectId.isNotBlank()) {
+            payload.put("groupId", groupId).put("groupSubjectId", groupSubjectId)
+        }
         val request = Request.Builder()
             .url("$baseUrl/api/v1/mobile/subjects/quiz/attempt")
-            .post(
-                JSONObject()
-                    .put("subjectId", subjectId)
-                    .put("questionId", questionId)
-                    .put("selectedIndex", selectedIndex)
-                    .toString()
-                    .toRequestBody(JSON),
-            )
+            .post(payload.toString().toRequestBody(JSON))
             .build()
         val response = execute(request) ?: return@withContext networkFailure()
         response.use { response ->

@@ -101,7 +101,7 @@ fun GroupLibraryScreen(
     LaunchedEffect(group.id) { load() }
     val activeItem = selectedItem
     if (activeItem != null) {
-        GroupLibraryReaderScreen(api = api, item = activeItem, onBack = { selectedItem = null })
+        GroupLibraryReaderScreen(api = api, groupId = group.id, item = activeItem, onBack = { selectedItem = null })
         return
     }
     BackHandler { onBack() }

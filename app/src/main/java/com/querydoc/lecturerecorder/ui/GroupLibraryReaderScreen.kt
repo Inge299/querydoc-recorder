@@ -18,6 +18,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -30,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,11 +42,17 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.AudioSessionSource
 import com.querydoc.lecturerecorder.data.remote.GroupLibraryItem
+import com.querydoc.lecturerecorder.data.remote.SubjectSummary
+import kotlinx.coroutines.launch
 import java.util.Locale
+
+private fun normalizedSubjectName(value: String): String =
+    value.lowercase(Locale("ru")).replace('ё', 'е').replace(Regex("[^\\p{L}\\p{N}]+"), " ").trim()
 
 @Composable
 fun GroupLibraryReaderScreen(
     api: ApiClient,
+    groupId: String,
     item: GroupLibraryItem,
     onBack: () -> Unit,
 ) {
@@ -53,6 +61,10 @@ fun GroupLibraryReaderScreen(
     var audioError by remember(item.id) { mutableStateOf("") }
     var player by remember(item.id) { mutableStateOf<MediaPlayer?>(null) }
     var playing by remember(item.id) { mutableStateOf(false) }
+    var quizSubject by remember(item.id) { mutableStateOf<SubjectSummary?>(null) }
+    var quizLoading by remember(item.id) { mutableStateOf(false) }
+    var quizError by remember(item.id) { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(item.id, item.sourceSessionId) {
         loadingAudio = true
@@ -109,6 +121,19 @@ fun GroupLibraryReaderScreen(
         }
     }
 
+    val activeQuiz = quizSubject
+    if (activeQuiz != null) {
+        SubjectQuizScreen(
+            api = api,
+            subject = activeQuiz,
+            groupId = groupId,
+            groupSubjectId = item.groupSubjectId,
+            onBack = { quizSubject = null },
+            onFinished = { quizSubject = null },
+        )
+        return
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -138,6 +163,51 @@ fun GroupLibraryReaderScreen(
                 color = Color(0xFF64748B),
                 modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
             )
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    enabled = !quizLoading,
+                    onClick = {
+                        val wanted = item.groupSubjectName.ifBlank { item.subject }.trim()
+                        if (wanted.isBlank()) {
+                            quizError = "У материала не указан предмет."
+                            return@Button
+                        }
+                        quizError = ""
+                        quizLoading = true
+                        scope.launch {
+                            when (val result = api.listSubjects()) {
+                                is ApiResult.Ok -> {
+                                    val subject = result.value.firstOrNull {
+                                        normalizedSubjectName(it.name) == normalizedSubjectName(wanted)
+                                    }
+                                    if (subject == null) {
+                                        quizError = "Сначала запишите лекцию по предмету «$wanted»."
+                                    } else if (subject.count <= 0) {
+                                        quizError = "По предмету «$wanted» пока нет конспектов для проверки."
+                                    } else {
+                                        quizSubject = subject
+                                    }
+                                }
+                                is ApiResult.Failure -> quizError = result.message
+                            }
+                            quizLoading = false
+                        }
+                    },
+                ) {
+                    Text(if (quizLoading) "Готовим…" else "Пройти проверку")
+                }
+            }
+            if (quizError.isNotBlank()) {
+                Text(
+                    quizError,
+                    color = Color(0xFF92400E),
+                    style = MaterialTheme.typography.bodySmall,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
+            }
             when {
                 loadingAudio -> CircularProgressIndicator(color = Color(0xFF4338CA), modifier = Modifier.padding(8.dp))
                 audioError.isNotBlank() -> Text(audioError, color = Color(0xFF92400E), style = MaterialTheme.typography.bodySmall)

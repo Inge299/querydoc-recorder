@@ -54,6 +54,8 @@ import kotlinx.coroutines.launch
 fun SubjectQuizScreen(
     api: ApiClient,
     subject: SubjectSummary,
+    groupId: String = "",
+    groupSubjectId: String = "",
     onBack: () -> Unit,
     onFinished: () -> Unit,
 ) {
@@ -215,7 +217,7 @@ fun SubjectQuizScreen(
                                 if (correct) correctCount += 1
                                 SubjectQuizStore.record(context, subject.id, question.id + ":" + question.question.take(40), correct, total, question.conspectTitle)
                                 scope.launch {
-                                    api.recordQuizAttempt(subject.id, question.id, selected)
+                                    api.recordQuizAttempt(subject.id, question.id, selected, groupId, groupSubjectId)
                                 }
                                 submitted = true
                             } else if (index + 1 >= total) {
