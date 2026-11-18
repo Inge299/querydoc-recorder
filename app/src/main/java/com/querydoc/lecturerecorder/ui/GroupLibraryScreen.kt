@@ -129,7 +129,7 @@ fun GroupLibraryScreen(
         }
 
         Text(
-            "Общие материалы группы. Личная копия конспекта остаётся у автора; удалить групповой материал может только владелец группы.",
+            "Общие материалы группы. Личная копия остаётся у автора; владелец может удалить любой материал, преподаватель — свой.",
             style = MaterialTheme.typography.bodySmall,
             color = Color(0xFF64748B),
             modifier = Modifier.padding(vertical = 8.dp),
@@ -166,7 +166,7 @@ fun GroupLibraryScreen(
                                     Text("Таймкоды: ${item.timeline.size}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF4338CA))
                                 }
                             }
-                            if (group.role == "owner" && item.canDelete) {
+                            if (item.canDelete) {
                                 IconButton(onClick = {
                                     scope.launch {
                                         when (val result = api.deleteGroupLibraryItem(group.id, item.id)) {

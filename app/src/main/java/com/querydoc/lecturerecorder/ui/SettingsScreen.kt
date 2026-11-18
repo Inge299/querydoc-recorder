@@ -334,7 +334,11 @@ fun SettingsScreen(
                     SettingRow(
                         icon = Icons.Filled.Group,
                         title = group.name,
-                        subtitle = if (group.role == "owner") "Вы преподаватель · ${group.memberCount} студентов" else "Участник · ${group.memberCount} студентов",
+                        subtitle = when (group.role) {
+                            "owner" -> "Вы преподаватель · ${group.memberCount} студентов"
+                            "teacher" -> "Преподаватель · ${group.memberCount} студентов"
+                            else -> "Участник · ${group.memberCount} студентов"
+                        },
                         onClick = { onOpenGroup(group) },
                     )
                     SettingDivider()
