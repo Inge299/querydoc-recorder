@@ -264,7 +264,7 @@ fun MaterialsScreen(
                 }
             }
             Text(
-                "Создание группы доступно владельцу на платном тарифе. Предметы и преподаватели настраиваются внутри группы.",
+                "Создать группу можно на платном тарифе. Предметы и преподаватели настраиваются внутри группы.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Muted,
                 modifier = Modifier.padding(top = 10.dp),

@@ -569,7 +569,7 @@ fun SettingsScreen(
     if (showInviteApp) {
         AlertDialog(
             onDismissRequest = { showInviteApp = false },
-            title = { Text("Пригласить в приложение") },
+            title = { Text("Пригласить друзей") },
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -616,7 +616,7 @@ fun SettingsScreen(
                     clipboard.setText(AnnotatedString(AppLinks.RUSTORE))
                     Toast.makeText(context, "Ссылка скопирована", Toast.LENGTH_SHORT).show()
                     showInviteApp = false
-                }) { Text("Копировать ссылку") }
+                }) { Text("Копировать") }
             },
         )
     }
