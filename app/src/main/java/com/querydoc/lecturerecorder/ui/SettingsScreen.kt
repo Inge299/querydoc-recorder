@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.SettingsVoice
@@ -60,6 +62,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.querydoc.lecturerecorder.BuildConfig
@@ -178,41 +181,82 @@ fun SettingsScreen(
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = Color.White),
-                shape = RoundedCornerShape(16.dp),
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
+            SettingsSection(title = "АККАУНТ") {
+                val phone = account?.phone?.takeIf { it.isNotBlank() }
+                val email = account?.email?.takeIf { it.isNotBlank() }
+                val plan = usage?.planName?.takeIf { it.isNotBlank() } ?: planLabel(account?.currentTariff)
+                val freePlan = plan == "Бесплатный" || plan == "—"
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Text(
-                        "АККАУНТ",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Color(0xFF64748B),
-                    )
-                    val phone = account?.phone?.takeIf { it.isNotBlank() }
-                    val email = account?.email?.takeIf { it.isNotBlank() }
-                    Text(
-                        phone ?: email ?: "Загружаем данные аккаунта…",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFF0F172A),
-                    )
-                    if (phone != null && email != null) {
-                        Text(
-                            email,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color(0xFF64748B),
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .background(Color(0xFFEEF2FF), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.Person,
+                            contentDescription = null,
+                            tint = Color(0xFF4338CA),
+                            modifier = Modifier.size(24.dp),
                         )
                     }
-                    Text(
-                        "Тариф: ${usage?.planName?.takeIf { it.isNotBlank() } ?: planLabel(account?.currentTariff)}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = Color(0xFF64748B),
-                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                phone?.let(::formatPhone) ?: email ?: "Загружаем данные…",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(0xFF0F172A),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .padding(start = 8.dp)
+                                    .background(
+                                        if (freePlan) Color(0xFFF1F5F9) else Color(0xFFEEF2FF),
+                                        RoundedCornerShape(50),
+                                    )
+                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                            ) {
+                                Text(
+                                    plan,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = if (freePlan) Color(0xFF475569) else Color(0xFF4338CA),
+                                )
+                            }
+                        }
+                        Text(
+                            when {
+                                phone != null && email != null -> email
+                                phone != null -> "Email не привязан"
+                                email != null -> "Телефон не привязан"
+                                else -> " "
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF64748B),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
                 }
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.Lock,
+                    title = "Сменить пароль",
+                    subtitle = "Текущий и новый пароль",
+                    onClick = { changePasswordOpen = true },
+                )
             }
 
             SettingsSection(title = "СООБЩЕНИЯ") {
@@ -419,14 +463,7 @@ fun SettingsScreen(
                 )
             }
 
-            SettingsSection(title = "АККАУНТ") {
-                SettingRow(
-                    icon = Icons.Filled.Lock,
-                    title = "Сменить пароль",
-                    subtitle = "Текущий и новый пароль",
-                    onClick = { changePasswordOpen = true },
-                )
-                SettingDivider()
+            SettingsSection(title = "СЕССИЯ") {
                 SettingRow(
                     icon = Icons.Filled.Logout,
                     title = "Выйти из аккаунта",
@@ -682,7 +719,14 @@ fun SettingsScreen(
     }
 
     if (changePasswordOpen) {
-        ChangePasswordDialog(api = api, onDismiss = { changePasswordOpen = false })
+        ChangePasswordDialog(
+            api = api,
+            onDismiss = { changePasswordOpen = false },
+            onForgotPassword = {
+                changePasswordOpen = false
+                onLogout()
+            },
+        )
     }
 }
 
@@ -976,4 +1020,14 @@ private fun planLabel(plan: String?): String = when (plan) {
     "free" -> "Бесплатный"
     null, "" -> "—"
     else -> plan
+}
+
+
+private fun formatPhone(raw: String): String {
+    val digits = raw.filter { it.isDigit() }
+    return if (digits.length == 11 && (digits.startsWith("7") || digits.startsWith("8"))) {
+        "+7 ${digits.substring(1, 4)} ${digits.substring(4, 7)}-${digits.substring(7, 9)}-${digits.substring(9, 11)}"
+    } else {
+        raw
+    }
 }

@@ -16,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -28,6 +29,7 @@ import kotlinx.coroutines.launch
 fun ChangePasswordDialog(
     api: ApiClient,
     onDismiss: () -> Unit,
+    onForgotPassword: () -> Unit,
 ) {
     var currentPassword by remember { mutableStateOf("") }
     var newPassword by remember { mutableStateOf("") }
@@ -74,6 +76,21 @@ fun ChangePasswordDialog(
                     )
                     if (error.isNotBlank()) {
                         Text(error, color = MaterialTheme.colorScheme.error)
+                    }
+                    Text(
+                        "Не помните текущий пароль? Восстановите его по телефону.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(
+                        onClick = {
+                            onDismiss()
+                            onForgotPassword()
+                        },
+                        enabled = !busy,
+                        modifier = Modifier.align(Alignment.End),
+                    ) {
+                        Text("Забыли пароль?")
                     }
                 }
             }
