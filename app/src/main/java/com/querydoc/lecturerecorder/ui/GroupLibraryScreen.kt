@@ -147,6 +147,15 @@ fun GroupLibraryScreen(
             items.isEmpty() -> Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Пока пусто", style = MaterialTheme.typography.titleMedium, color = Color(0xFF334155))
                 Text("Добавьте свой конспект в общую библиотеку.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF64748B), modifier = Modifier.padding(top = 6.dp))
+                Button(
+                    onClick = {
+                        loadConspects()
+                        showShare = true
+                    },
+                    modifier = Modifier.padding(top = 14.dp),
+                ) {
+                    Text("Добавить конспект")
+                }
             }
             else -> Column(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()),

@@ -406,6 +406,17 @@ class MainActivity : ComponentActivity() {
                                     readerSession = summary.sessionId
                                 },
                             )
+                            "groupLibrary" -> GroupLibraryScreen(
+                                api = api,
+                                group = groupLibraryGroup ?: StudyGroupSummary(
+                                    id = "",
+                                    name = "",
+                                    role = "",
+                                    memberCount = 0,
+                                    inviteCode = "",
+                                ),
+                                onBack = { groupLibraryGroup = null },
+                            )
                             "reader" -> ConspectReaderScreen(
                                 api = api,
                                 sessionId = readerSession.orEmpty(),

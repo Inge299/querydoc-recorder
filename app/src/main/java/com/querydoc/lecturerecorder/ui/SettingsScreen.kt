@@ -19,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.RecordVoiceOver
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SettingsVoice
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.Button
@@ -121,6 +123,12 @@ fun SettingsScreen(
     var groupCode by remember { mutableStateOf("") }
     var groupError by remember { mutableStateOf("") }
     var groupBusy by remember { mutableStateOf(false) }
+    var showCreateGroupDialog by remember { mutableStateOf(false) }
+    var groupName by remember { mutableStateOf("") }
+    var groupCreateError by remember { mutableStateOf("") }
+    var groupCreateBusy by remember { mutableStateOf(false) }
+    var groupsError by remember { mutableStateOf("") }
+    var groupsReload by remember { mutableStateOf(0) }
     var invites by remember { mutableStateOf<List<TeacherInviteSummary>>(emptyList()) }
     var inviteBusyId by remember { mutableStateOf("") }
     var inviteError by remember { mutableStateOf("") }
@@ -131,7 +139,7 @@ fun SettingsScreen(
     var deletePassword by remember { mutableStateOf("") }
     var deleteBusy by remember { mutableStateOf(false) }
     var deleteError by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) {
+    LaunchedEffect(groupsReload) {
         when (val result = api.usage()) {
             is ApiResult.Ok -> usage = result.value
             is ApiResult.Failure -> usageError = result.message
@@ -141,8 +149,11 @@ fun SettingsScreen(
             is ApiResult.Failure -> Unit
         }
         when (val result = api.listStudyGroups()) {
-            is ApiResult.Ok -> groups = result.value
-            is ApiResult.Failure -> Unit
+            is ApiResult.Ok -> {
+                groups = result.value
+                groupsError = ""
+            }
+            is ApiResult.Failure -> groupsError = result.message
         }
         when (val result = api.listTeacherInvites()) {
             is ApiResult.Ok -> invites = result.value
@@ -419,6 +430,14 @@ fun SettingsScreen(
             }
 
             SettingsSection(title = "ГРУППЫ") {
+                if (groupsError.isNotBlank()) {
+                    Text(
+                        groupsError,
+                        color = Color(0xFFB91C1C),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                }
                 groups.forEach { group ->
                     SettingRow(
                         icon = Icons.Filled.Group,
@@ -432,6 +451,25 @@ fun SettingsScreen(
                     )
                     SettingDivider()
                 }
+                SettingRow(
+                    icon = Icons.Filled.Add,
+                    title = "Создать группу",
+                    subtitle = "Для преподавателя на платном тарифе",
+                    onClick = {
+                        groupName = ""
+                        groupCreateError = ""
+                        showCreateGroupDialog = true
+                    },
+                    trailing = { Chevron() },
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.Refresh,
+                    title = "Обновить список",
+                    subtitle = "Если группа не появилась",
+                    onClick = { groupsReload += 1 },
+                )
+                SettingDivider()
                 SettingRow(
                     icon = Icons.Filled.Group,
                     title = "Присоединиться к группе",
@@ -670,6 +708,59 @@ fun SettingsScreen(
                 ) { Text(if (groupBusy) "Входим…" else "Войти") }
             },
             dismissButton = { TextButton(enabled = !groupBusy, onClick = { showGroupDialog = false }) { Text("Отмена") } },
+        )
+    }
+
+    if (showCreateGroupDialog) {
+        AlertDialog(
+            onDismissRequest = { if (!groupCreateBusy) showCreateGroupDialog = false },
+            title = { Text("Создать группу") },
+            text = {
+                Column {
+                    Text("Студенты вступят по коду. Создавать группы может преподаватель на платном тарифе.")
+                    androidx.compose.material3.OutlinedTextField(
+                        value = groupName,
+                        onValueChange = {
+                            groupName = it.take(60)
+                            groupCreateError = ""
+                        },
+                        singleLine = true,
+                        label = { Text("Название группы") },
+                        modifier = Modifier.padding(top = 12.dp).fillMaxWidth(),
+                    )
+                    if (groupCreateError.isNotBlank()) {
+                        Text(
+                            groupCreateError,
+                            color = Color(0xFFB91C1C),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = groupName.isNotBlank() && !groupCreateBusy,
+                    onClick = {
+                        groupCreateBusy = true
+                        groupCreateError = ""
+                        scope.launch {
+                            when (val result = api.createStudyGroup(groupName)) {
+                                is ApiResult.Ok -> {
+                                    groups = (groups + result.value).distinctBy { it.id }
+                                    showCreateGroupDialog = false
+                                    groupsError = ""
+                                }
+                                is ApiResult.Failure -> groupCreateError = result.message
+                            }
+                            groupCreateBusy = false
+                        }
+                    },
+                ) { Text(if (groupCreateBusy) "Создаём…" else "Создать") }
+            },
+            dismissButton = {
+                TextButton(enabled = !groupCreateBusy, onClick = { showCreateGroupDialog = false }) { Text("Отмена") }
+            },
         )
     }
 
