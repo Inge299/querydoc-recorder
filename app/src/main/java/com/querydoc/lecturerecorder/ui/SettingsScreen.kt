@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.querydoc.lecturerecorder.BuildConfig
 import com.querydoc.lecturerecorder.data.remote.ApiClient
+import com.querydoc.lecturerecorder.data.remote.AccountSummary
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.UsageSummary
 import com.querydoc.lecturerecorder.data.remote.StudyGroupSummary
@@ -119,6 +120,7 @@ fun SettingsScreen(
     var inviteBusyId by remember { mutableStateOf("") }
     var inviteError by remember { mutableStateOf("") }
     var inviteNotice by remember { mutableStateOf("") }
+    var account by remember { mutableStateOf<AccountSummary?>(null) }
     val scope = rememberCoroutineScope()
     var deleteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
@@ -128,6 +130,10 @@ fun SettingsScreen(
         when (val result = api.usage()) {
             is ApiResult.Ok -> usage = result.value
             is ApiResult.Failure -> usageError = result.message
+        }
+        when (val result = api.me()) {
+            is ApiResult.Ok -> account = result.value
+            is ApiResult.Failure -> Unit
         }
         when (val result = api.listStudyGroups()) {
             is ApiResult.Ok -> groups = result.value
@@ -170,6 +176,43 @@ fun SettingsScreen(
                 .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(containerColor = Color.White),
+                shape = RoundedCornerShape(16.dp),
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    Text(
+                        "АККАУНТ",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF64748B),
+                    )
+                    val phone = account?.phone?.takeIf { it.isNotBlank() }
+                    val email = account?.email?.takeIf { it.isNotBlank() }
+                    Text(
+                        phone ?: email ?: "Загружаем данные аккаунта…",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFF0F172A),
+                    )
+                    if (phone != null && email != null) {
+                        Text(
+                            email,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFF64748B),
+                        )
+                    }
+                    Text(
+                        "Тариф: ${usage?.planName?.takeIf { it.isNotBlank() } ?: planLabel(account?.currentTariff)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF64748B),
+                    )
+                }
+            }
+
             SettingsSection(title = "СООБЩЕНИЯ") {
                 SettingRow(
                     icon = Icons.Filled.Notifications,
@@ -910,4 +953,14 @@ private fun CheckMark() {
 private fun Chevron() {
     Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(20.dp))
 
+}
+
+
+private fun planLabel(plan: String?): String = when (plan) {
+    "student" -> "Студенческий"
+    "basic" -> "Базовый"
+    "pro" -> "Профессиональный"
+    "free" -> "Бесплатный"
+    null, "" -> "—"
+    else -> plan
 }

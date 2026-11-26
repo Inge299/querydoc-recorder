@@ -128,6 +128,13 @@ data class UsageSummary(
     val documentsLimit: Int = 0,
 )
 
+data class AccountSummary(
+    val phone: String = "",
+    val email: String = "",
+    val currentTariff: String = "",
+    val tariffEndDate: String = "",
+)
+
 data class PlanInfo(
     val id: String,
     val name: String,
@@ -853,6 +860,36 @@ class ApiClient(context: Context) {
                     storageLimitBytes = storage?.optLong("limitBytes") ?: 0L,
                     documentsUsed = documents?.optInt("used") ?: 0,
                     documentsLimit = documents?.optInt("limit") ?: 0,
+                ),
+            )
+        }
+    }
+
+    suspend fun me(): ApiResult<AccountSummary> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/me")
+            .get()
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (!response.isSuccessful || json == null) {
+                return@use ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось загрузить аккаунт" },
+                    response.code >= 500,
+                )
+            }
+            val user = json.optJSONObject("user")
+                ?: return@use ApiResult.Failure(500, "no_user", "Не удалось загрузить аккаунт", true)
+            ApiResult.Ok(
+                AccountSummary(
+                    phone = user.optString("phone"),
+                    email = user.optString("email"),
+                    currentTariff = user.optString("currentTariff"),
+                    tariffEndDate = user.optString("tariffEndDate"),
                 ),
             )
         }
