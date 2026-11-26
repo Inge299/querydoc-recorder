@@ -2,6 +2,7 @@ package com.querydoc.lecturerecorder.data.remote
 
 import android.content.Context
 import com.querydoc.lecturerecorder.config.AppConfig
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -129,6 +130,7 @@ data class UsageSummary(
 )
 
 data class AccountSummary(
+    val id: String = "",
     val phone: String = "",
     val email: String = "",
     val currentTariff: String = "",
@@ -490,6 +492,8 @@ class ApiClient(context: Context) {
             val raw = response.body?.string().orEmpty()
             val json = runCatching { JSONObject(raw) }.getOrNull()
             if (response.isSuccessful && json?.optBoolean("success") == true) {
+                val userId = json.optJSONObject("user")?.optString("id").orEmpty()
+                if (userId.isNotBlank()) LocalAccountStore.set(appContext, userId)
                 ApiResult.Ok(Unit)
             } else {
                 ApiResult.Failure(
@@ -507,6 +511,7 @@ class ApiClient(context: Context) {
             client.newCall(Request.Builder().url("$baseUrl/api/auth/logout").post(EMPTY).build()).execute().close()
         }
         cookieJar.clear()
+        LocalAccountStore.clear(appContext)
     }
 
     suspend fun restoreSession(): Boolean = withContext(Dispatchers.IO) {
@@ -884,8 +889,11 @@ class ApiClient(context: Context) {
             }
             val user = json.optJSONObject("user")
                 ?: return@use ApiResult.Failure(500, "no_user", "Не удалось загрузить аккаунт", true)
+            val userId = user.optString("id")
+            if (userId.isNotBlank()) LocalAccountStore.set(appContext, userId)
             ApiResult.Ok(
                 AccountSummary(
+                    id = userId,
                     phone = user.optString("phone"),
                     email = user.optString("email"),
                     currentTariff = user.optString("currentTariff"),

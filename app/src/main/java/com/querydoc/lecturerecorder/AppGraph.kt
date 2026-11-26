@@ -3,6 +3,7 @@ package com.querydoc.lecturerecorder
 import android.content.Context
 import androidx.room.Room
 import com.querydoc.lecturerecorder.data.local.AppDatabase
+import com.querydoc.lecturerecorder.data.local.MIGRATION_2_3
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.repository.QueryDocUploadRepository
 import com.querydoc.lecturerecorder.data.repository.UploadRepository
@@ -29,7 +30,7 @@ object AppGraph {
                 context.applicationContext,
                 AppDatabase::class.java,
                 "lecture-recorder.db"
-            ).fallbackToDestructiveMigration().build().also { dbInstance = it }
+            ).addMigrations(MIGRATION_2_3).fallbackToDestructiveMigration().build().also { dbInstance = it }
         }
     }
 

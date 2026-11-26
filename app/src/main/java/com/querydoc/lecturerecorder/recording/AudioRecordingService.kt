@@ -11,6 +11,7 @@ import com.querydoc.lecturerecorder.AppGraph
 import com.querydoc.lecturerecorder.R
 import com.querydoc.lecturerecorder.config.AppConfig
 import com.querydoc.lecturerecorder.data.local.MediaType
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.diagnostics.Diagnostics
@@ -246,6 +247,7 @@ class AudioRecordingService : Service() {
                 AppGraph.db(applicationContext).uploadQueueDao().upsert(
                     UploadQueueEntity(
                         id = UUID.randomUUID().toString(),
+                        ownerUserId = LocalAccountStore.current(applicationContext),
                         displayName = file.name,
                         mediaType = MediaType.AUDIO_CHUNK,
                         filePath = file.absolutePath,

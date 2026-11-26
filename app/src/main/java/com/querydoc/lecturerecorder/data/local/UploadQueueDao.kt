@@ -11,20 +11,23 @@ interface UploadQueueDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(item: UploadQueueEntity)
 
-    @Query("SELECT COUNT(*) FROM upload_queue WHERE status = 'PENDING' OR status = 'FAILED' OR status = 'UPLOADING'")
-    fun observePendingCount(): Flow<Int>
+    @Query("SELECT COUNT(*) FROM upload_queue WHERE ownerUserId = :owner AND (status = 'PENDING' OR status = 'FAILED' OR status = 'UPLOADING')")
+    fun observePendingCount(owner: String): Flow<Int>
 
-    @Query("SELECT * FROM upload_queue WHERE mediaType = 'AUDIO_CHUNK' ORDER BY createdAtMs DESC")
-    fun observeAudioItems(): Flow<List<UploadQueueEntity>>
+    @Query("SELECT * FROM upload_queue WHERE ownerUserId = :owner AND mediaType = 'AUDIO_CHUNK' ORDER BY createdAtMs DESC")
+    fun observeAudioItems(owner: String): Flow<List<UploadQueueEntity>>
 
-    @Query("SELECT * FROM upload_queue WHERE mediaType = 'CROPPED_PHOTO' ORDER BY createdAtMs DESC")
-    fun observePhotoItems(): Flow<List<UploadQueueEntity>>
+    @Query("SELECT * FROM upload_queue WHERE ownerUserId = :owner AND mediaType = 'CROPPED_PHOTO' ORDER BY createdAtMs DESC")
+    fun observePhotoItems(owner: String): Flow<List<UploadQueueEntity>>
+
+    @Query("SELECT * FROM upload_queue WHERE ownerUserId = :owner AND mediaType = 'AUDIO_CHUNK' ORDER BY createdAtMs ASC")
+    suspend fun allAudioItems(owner: String): List<UploadQueueEntity>
 
     @Query("SELECT * FROM upload_queue WHERE mediaType = 'AUDIO_CHUNK' ORDER BY createdAtMs ASC")
-    suspend fun allAudioItems(): List<UploadQueueEntity>
+    suspend fun allAudioItemsForCleanup(): List<UploadQueueEntity>
 
-    @Query("SELECT * FROM upload_queue WHERE status IN ('PENDING', 'FAILED') ORDER BY createdAtMs ASC LIMIT 1")
-    suspend fun nextPending(): UploadQueueEntity?
+    @Query("SELECT * FROM upload_queue WHERE ownerUserId = :owner AND status IN ('PENDING', 'FAILED') ORDER BY createdAtMs ASC LIMIT 1")
+    suspend fun nextPending(owner: String): UploadQueueEntity?
 
     @Query(
         "SELECT * FROM upload_queue " +
@@ -44,6 +47,9 @@ interface UploadQueueDao {
 
     @Query("SELECT * FROM upload_queue WHERE filePath = :filePath LIMIT 1")
     suspend fun findByFilePath(filePath: String): UploadQueueEntity?
+
+    @Query("DELETE FROM upload_queue WHERE ownerUserId = :owner")
+    suspend fun deleteByOwner(owner: String)
 
     @Query("DELETE FROM upload_queue")
     suspend fun deleteAll()

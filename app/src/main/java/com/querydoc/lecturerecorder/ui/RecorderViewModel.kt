@@ -18,6 +18,7 @@ import com.querydoc.lecturerecorder.data.local.AudioCache
 import com.querydoc.lecturerecorder.data.local.BookmarkStore
 import com.querydoc.lecturerecorder.data.local.StudyProgressStore
 import com.querydoc.lecturerecorder.data.local.PlaybackPositionStore
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.data.local.UploadQueueEntity
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.media.AudioImportExtractor
@@ -35,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
@@ -258,7 +260,7 @@ class RecorderViewModel(
     fun clearLocalAudioCache() {
         viewModelScope.launch(Dispatchers.IO) {
             val dao = AppGraph.db(app).uploadQueueDao()
-            dao.allAudioItems().forEach { item ->
+            ownedAudioItems().forEach { item ->
                 runCatching { File(item.filePath).delete() }
             }
             File(app.filesDir, "audio_cache").deleteRecursively()
@@ -489,7 +491,7 @@ class RecorderViewModel(
 
     fun requestConspect(sessionId: String) {
         if (!conspectJobs.add(sessionId)) return
-        val cached = ConspectCache.get(app, sessionId)
+        val cached = ConspectCache.get(app, sessionId, currentQueueOwner())
         _state.update {
             it.copy(
                 statusText = if (cached != null) "Конспект готов" else "Готовим конспект…",
@@ -566,7 +568,7 @@ class RecorderViewModel(
                 }
                 val finalState = current
                 if (finalState != null && finalState.status == "completed") {
-                    ConspectCache.save(app, sessionId, finalState.markdown)
+                    ConspectCache.save(app, sessionId, finalState.markdown, currentQueueOwner())
                     _state.update { it.copy(statusText = "Конспект готов", conspectDialog = finalState) }
                     refreshUsage()
                 } else if (finalState != null && finalState.status == "failed") {
@@ -741,7 +743,7 @@ class RecorderViewModel(
 
     private suspend fun markShortSession(sessionId: String) {
         withContext(Dispatchers.IO) {
-            val items = dao.allAudioItems().filter { item ->
+            val items = ownedAudioItems().filter { item ->
                 item.metadataJson?.contains("sessionId=$sessionId") == true
             }
             val now = System.currentTimeMillis()
@@ -779,13 +781,13 @@ class RecorderViewModel(
 
     fun clearLocalData() {
         viewModelScope.launch(Dispatchers.IO) {
-            runCatching { dao.allAudioItems() }.getOrDefault(emptyList()).forEach { item ->
+            runCatching { ownedAudioItems() }.getOrDefault(emptyList()).forEach { item ->
                 runCatching { File(item.filePath).delete() }
             }
-            runCatching { dao.deleteAll() }
+            runCatching { val owner = currentQueueOwner(); if (owner.isNotBlank()) dao.deleteByOwner(owner) }
             runCatching { File(app.filesDir, "audio_chunks").deleteRecursively() }
             runCatching { File(app.filesDir, "audio_cache").deleteRecursively() }
-            ConspectCache.clearAll(app)
+            ConspectCache.clearOwner(app, currentQueueOwner())
             _state.update {
                 it.copy(
                     recordings = emptyList(),
@@ -813,17 +815,30 @@ class RecorderViewModel(
         }
     }
 
+    private fun currentQueueOwner(): String = LocalAccountStore.current(app)
+
+    private suspend fun ownedAudioItems(): List<UploadQueueEntity> {
+        val owner = currentQueueOwner()
+        return if (owner.isBlank()) emptyList() else dao.allAudioItems(owner)
+    }
+
     private fun observeQueue() {
         viewModelScope.launch {
-            dao.observeAudioItems().collect { queueItems ->
-                updateRecordings(queueItems)
+            LocalAccountStore.userId.collectLatest { owner ->
+                if (owner.isBlank()) {
+                    updateRecordings(emptyList())
+                } else {
+                    dao.observeAudioItems(owner).collect { queueItems ->
+                        updateRecordings(queueItems)
+                    }
+                }
             }
         }
     }
 
     fun refreshRecordings() {
         viewModelScope.launch {
-            val items = dao.allAudioItems()
+            val items = ownedAudioItems()
             updateRecordings(items)
             val sessionIds = items.mapNotNull { item ->
                 parseMetadataValue(item.metadataJson, "sessionId")
@@ -872,8 +887,14 @@ class RecorderViewModel(
 
     private fun observePendingUploads() {
         viewModelScope.launch {
-            dao.observePendingCount().collect { pending ->
-                _state.update { it.copy(pendingUploads = pending) }
+            LocalAccountStore.userId.collectLatest { owner ->
+                if (owner.isBlank()) {
+                    _state.update { it.copy(pendingUploads = 0) }
+                } else {
+                    dao.observePendingCount(owner).collect { pending ->
+                        _state.update { it.copy(pendingUploads = pending) }
+                    }
+                }
             }
         }
     }
@@ -1190,7 +1211,7 @@ class RecorderViewModel(
         val recognized = if (serverConspectDetails != null) {
             conspectStatus == "completed"
         } else {
-            ConspectCache.get(app, sessionId) != null
+            ConspectCache.get(app, sessionId, currentQueueOwner()) != null
         }
         val stage = when {
             uploadStatus == UploadStatus.FAILED || uploadStatus == UploadStatus.REJECTED -> RecordingStage.FAILED

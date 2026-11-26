@@ -90,6 +90,7 @@ import com.querydoc.lecturerecorder.data.local.BookmarkStore
 import com.querydoc.lecturerecorder.data.remote.LectureCitation
 import com.querydoc.lecturerecorder.data.remote.QaHistoryTurn
 import com.querydoc.lecturerecorder.data.local.AudioBookmark
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.work.ConspectCache
 import kotlinx.coroutines.launch
 
@@ -109,6 +110,7 @@ fun ConspectReaderScreen(
     onBack: () -> Unit,
 ) {
     val context = LocalContext.current
+    val owner = LocalAccountStore.current(context)
     val isDocument = sourceType == "pdf" || sourceType == "docx" || sourceType == "transcript"
     var markdown by remember { mutableStateOf(initialMarkdown.orEmpty()) }
     var loading by remember { mutableStateOf(markdown.isBlank()) }
@@ -116,7 +118,7 @@ fun ConspectReaderScreen(
     var error by remember { mutableStateOf("") }
     var reload by remember { mutableStateOf(0) }
     var tab by remember { mutableIntStateOf(0) }
-    var transcript by remember { mutableStateOf(ConspectCache.getTranscript(context, sessionId).orEmpty()) }
+    var transcript by remember { mutableStateOf(ConspectCache.getTranscript(context, sessionId, owner).orEmpty()) }
     var transcriptLoading by remember { mutableStateOf(false) }
     var transcriptError by remember { mutableStateOf("") }
     var transcriptReload by remember { mutableStateOf(0) }
@@ -136,7 +138,7 @@ fun ConspectReaderScreen(
     }
 
     LaunchedEffect(reload) {
-        val cached = ConspectCache.get(context, sessionId)
+        val cached = ConspectCache.get(context, sessionId, owner)
         if (markdown.isBlank() && cached != null) markdown = cached
         loading = markdown.isBlank()
         when (val result = api.conspect(sessionId)) {
@@ -161,10 +163,10 @@ fun ConspectReaderScreen(
         when (val result = api.transcript(sessionId)) {
             is ApiResult.Ok -> {
                 transcript = result.value.transcript
-                ConspectCache.saveTranscript(context, sessionId, transcript)
+                ConspectCache.saveTranscript(context, sessionId, transcript, owner)
             }
             is ApiResult.Failure -> {
-                transcript = ConspectCache.getTranscript(context, sessionId).orEmpty()
+                transcript = ConspectCache.getTranscript(context, sessionId, owner).orEmpty()
                 transcriptError = if (transcript.isBlank()) result.message else ""
             }
         }
@@ -696,6 +698,7 @@ private fun AudioTabContent(
         if (isCurrent) onSeek(sessionId, fraction) else onPlay(sessionId, fraction)
     }
     val context = LocalContext.current
+    val owner = LocalAccountStore.current(context)
     var bookmarks by remember(sessionId) { mutableStateOf(BookmarkStore.list(context, sessionId)) }
     var showBookmarkDialog by remember { mutableStateOf(false) }
     var bookmarkLabel by remember { mutableStateOf("") }

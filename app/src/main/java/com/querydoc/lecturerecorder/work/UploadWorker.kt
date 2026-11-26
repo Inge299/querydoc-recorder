@@ -5,6 +5,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.querydoc.lecturerecorder.AppGraph
 import com.querydoc.lecturerecorder.config.AppConfig
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.data.local.UploadStatus
 import com.querydoc.lecturerecorder.data.repository.UploadMetadata
 import com.querydoc.lecturerecorder.data.repository.UploadResult
@@ -20,9 +21,11 @@ class UploadWorker(
         Diagnostics.info(applicationContext, "UploadWorker: started")
         val dao = AppGraph.db(applicationContext).uploadQueueDao()
         val repository = AppGraph.uploadRepository(applicationContext)
+        val owner = LocalAccountStore.current(applicationContext)
+        if (owner.isBlank()) return Result.success()
 
         while (true) {
-            val item = dao.nextPending() ?: break
+            val item = dao.nextPending(owner) ?: break
             val now = System.currentTimeMillis()
             dao.updateStatus(item.id, UploadStatus.UPLOADING, item.retryCount, now)
 
@@ -57,13 +60,13 @@ class UploadWorker(
             }
         }
 
-        scheduleCompletedSessions(dao)
+        scheduleCompletedSessions(dao, owner)
         return Result.success()
     }
 
-    private suspend fun scheduleCompletedSessions(dao: com.querydoc.lecturerecorder.data.local.UploadQueueDao) {
+    private suspend fun scheduleCompletedSessions(dao: com.querydoc.lecturerecorder.data.local.UploadQueueDao, owner: String) {
         runCatching {
-            val grouped = dao.allAudioItems()
+            val grouped = dao.allAudioItems(owner)
                 .mapNotNull { item -> UploadMetadata.parse(item.metadataJson)?.let { meta -> meta to item } }
                 .groupBy { (meta, _) -> meta.sessionId }
             grouped.forEach { (sessionId, entries) ->

@@ -11,6 +11,7 @@ import androidx.room.PrimaryKey
 data class UploadQueueEntity(
     @PrimaryKey
     val id: String,
+    val ownerUserId: String = "",
     val displayName: String,
     val mediaType: MediaType,
     val filePath: String,

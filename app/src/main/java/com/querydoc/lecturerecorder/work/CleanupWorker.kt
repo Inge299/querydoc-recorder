@@ -21,7 +21,7 @@ class CleanupWorker(
         val retentionMs = AudioStorageStore.retentionDays(applicationContext) * 24L * 60L * 60L * 1_000L
         val limitBytes = AudioStorageStore.limitBytes(applicationContext)
 
-        val uploaded = dao.allAudioItems().filter { item ->
+        val uploaded = dao.allAudioItemsForCleanup().filter { item ->
             item.status == UploadStatus.UPLOADED && File(item.filePath).exists()
         }
         var deleted = 0
@@ -44,7 +44,7 @@ class CleanupWorker(
         }.forEach { deleteItem(it) }
 
         // Hard size cap: remove the oldest audio first.
-        val remaining = dao.allAudioItems().filter { item ->
+        val remaining = dao.allAudioItemsForCleanup().filter { item ->
             item.status == UploadStatus.UPLOADED && File(item.filePath).exists()
         }
         var totalBytes = remaining.sumOf { File(it.filePath).length().coerceAtLeast(0L) }

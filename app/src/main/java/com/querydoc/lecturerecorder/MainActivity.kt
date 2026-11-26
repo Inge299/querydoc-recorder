@@ -54,6 +54,7 @@ import com.querydoc.lecturerecorder.ui.RecorderViewModel
 import com.querydoc.lecturerecorder.ui.SettingsScreen
 import com.querydoc.lecturerecorder.work.AdminAlertsScheduler
 import com.querydoc.lecturerecorder.work.CleanupScheduler
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.work.ConspectCache
 import com.querydoc.lecturerecorder.work.ConspectScheduler
 import com.querydoc.lecturerecorder.work.UploadScheduler
@@ -180,7 +181,7 @@ class MainActivity : ComponentActivity() {
             LaunchedEffect(requestedConspect, introVisible, loggedIn) {
                 if (!introVisible && loggedIn && !requestedConspect.isNullOrBlank()) {
                     pendingConspectSessionId.value = null
-                    readerMarkdown = ConspectCache.get(applicationContext, requestedConspect)
+                    readerMarkdown = ConspectCache.get(applicationContext, requestedConspect, LocalAccountStore.current(applicationContext))
                     readerSession = requestedConspect
                 }
             }
@@ -246,6 +247,11 @@ class MainActivity : ComponentActivity() {
                         is ApiResult.Ok -> unreadNotifications = inbox.value.unread
                         is ApiResult.Failure -> Unit
                     }
+                }
+            }
+            LaunchedEffect(loggedIn) {
+                if (loggedIn) {
+                    api.me()
                 }
             }
             LaunchedEffect(showSettings, showConspects, readerSession) {

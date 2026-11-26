@@ -75,6 +75,7 @@ import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.ApiResult
 import com.querydoc.lecturerecorder.data.remote.ConspectSummary
 import com.querydoc.lecturerecorder.data.remote.SubjectSummary
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.work.ConspectCache
 import com.querydoc.lecturerecorder.study.StudyPlanStore
 import java.time.Instant
@@ -110,7 +111,8 @@ fun ConspectsScreen(
     var trainingQuizSubject by remember { mutableStateOf<SubjectSummary?>(null) }
     val listState = rememberLazyListState()
     var deleting by remember { mutableStateOf(false) }
-    var cachedIds by remember { mutableStateOf(ConspectCache.list(context).map { it.sessionId }.toSet()) }
+    val owner = LocalAccountStore.current(context)
+    var cachedIds by remember { mutableStateOf(ConspectCache.list(context, owner).map { it.sessionId }.toSet()) }
     val conspectPrefs = remember { context.getSharedPreferences("conspect_prefs", android.content.Context.MODE_PRIVATE) }
     var sortByName by remember { mutableStateOf(conspectPrefs.getBoolean("sort_by_name", false)) }
     var seenSessionIds by remember {
@@ -133,11 +135,11 @@ fun ConspectsScreen(
             is ApiResult.Ok -> {
                 items = result.value
                 val serverIds = items.map { it.sessionId }.toSet()
-                ConspectCache.list(context)
+                ConspectCache.list(context, owner)
                     .map { it.sessionId }
                     .filterNot { it in serverIds }
                     .forEach { ConspectCache.remove(context, it) }
-                cachedIds = ConspectCache.list(context).map { it.sessionId }.toSet()
+                cachedIds = ConspectCache.list(context, owner).map { it.sessionId }.toSet()
                 offline = false
                 when (val subjectResult = api.listSubjects()) {
                     is ApiResult.Ok -> subjects = subjectResult.value
@@ -145,7 +147,7 @@ fun ConspectsScreen(
                 }
             }
             is ApiResult.Failure -> {
-                items = ConspectCache.list(context)
+                items = ConspectCache.list(context, owner)
                 cachedIds = items.map { it.sessionId }.toSet()
                 offline = true
             }

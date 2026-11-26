@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.querydoc.lecturerecorder.AppGraph
+import com.querydoc.lecturerecorder.data.local.LocalAccountStore
 import com.querydoc.lecturerecorder.MainActivity
 import com.querydoc.lecturerecorder.R
 import com.querydoc.lecturerecorder.data.remote.ApiResult
@@ -44,7 +45,7 @@ class ConspectWorker(
                     val state = result.value
                     if (state.status == "completed") {
                         ConspectScheduler.markCompleted(applicationContext, sessionId)
-                        ConspectCache.save(applicationContext, sessionId, state.markdown)
+                        ConspectCache.save(applicationContext, sessionId, state.markdown, LocalAccountStore.current(applicationContext))
                         ConspectScheduler.markUnseen(applicationContext, sessionId)
                         notifyCompleted(sessionId, state.markdown)
                         Analytics.track(applicationContext, "conspect_completed")
@@ -92,7 +93,8 @@ class ConspectWorker(
 
     private suspend fun markShortSession(sessionId: String) {
         val dao = AppGraph.db(applicationContext).uploadQueueDao()
-        val items = dao.allAudioItems().filter { item ->
+        val owner = LocalAccountStore.current(applicationContext)
+        val items = (if (owner.isBlank()) emptyList() else dao.allAudioItems(owner)).filter { item ->
             item.metadataJson?.contains("sessionId=$sessionId") == true
         }
         val now = System.currentTimeMillis()
