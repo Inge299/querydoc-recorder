@@ -11,7 +11,9 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -33,8 +35,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.QrCode2
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material3.AlertDialog
@@ -47,7 +54,11 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -65,8 +76,12 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
 import com.querydoc.lecturerecorder.config.AppLinks
 import com.querydoc.lecturerecorder.data.remote.AccountSummary
@@ -127,7 +142,7 @@ fun GroupLibraryScreen(
         if (uri != null) {
             val value = readContactValue(context, uri)
             if (value.isNullOrBlank()) {
-                inviteError = "В выбранном контакте нет телефона или email"
+                inviteError = "В выбранном контакте нет телефона"
             } else {
                 inviteContact = value
                 inviteError = ""
@@ -570,47 +585,152 @@ fun GroupLibraryScreen(
 
     if (showInvite) {
         val inviteSubject = groupSubjects.firstOrNull { it.id == inviteSubjectId }
-        AlertDialog(
-            onDismissRequest = { if (!inviteBusy) showInvite = false },
-            title = { Text("Пригласить преподавателя") },
-            text = {
-                Column {
-                    Text(
-                        "Отправьте ссылку или приглашение на телефон/email. Преподаватель примет его в приложении.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GroupMuted,
-                    )
-                    if (groupSubjects.size > 1) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier
-                                .padding(top = 10.dp)
-                                .horizontalScroll(rememberScrollState()),
-                        ) {
-                            groupSubjects.forEach { subject ->
-                                FilterChip(
-                                    selected = inviteSubjectId == subject.id,
-                                    onClick = { inviteSubjectId = subject.id },
-                                    label = { Text(subject.name) },
+        Dialog(onDismissRequest = { if (!inviteBusy) showInvite = false }) {
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = Color.White,
+                shadowElevation = 10.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 640.dp),
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = 20.dp, vertical = 20.dp),
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(
+                                modifier = Modifier
+                                    .size(46.dp)
+                                    .background(Color(0xFFEEF2FF), RoundedCornerShape(15.dp)),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Icon(
+                                    Icons.Filled.PersonAdd,
+                                    contentDescription = null,
+                                    tint = GroupAccent,
+                                    modifier = Modifier.size(24.dp),
                                 )
                             }
+                            Spacer(Modifier.weight(1f))
+                            IconButton(enabled = !inviteBusy, onClick = { showInvite = false }) {
+                                Icon(Icons.Filled.Close, contentDescription = "Закрыть", tint = GroupMuted)
+                            }
                         }
-                    }
-                    if (inviteSubject != null) {
                         Text(
-                            "Предмет: ${inviteSubject.name}",
-                            style = MaterialTheme.typography.bodySmall,
+                            "Пригласить преподавателя",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.SemiBold,
                             color = GroupInk,
-                            modifier = Modifier.padding(top = 8.dp),
+                            modifier = Modifier.padding(top = 12.dp),
                         )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .padding(top = 10.dp)
-                            .fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    ) {
+                        Text(
+                            "Отправьте ссылку — преподаватель примет её в приложении.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GroupMuted,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+
+                        Spacer(Modifier.height(18.dp))
+                        Text(
+                            "ПРЕДМЕТ",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GroupMuted,
+                        )
+                        when {
+                            groupSubjects.isEmpty() -> Text(
+                                "Сначала добавьте предмет на вкладке «Предметы».",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFB45309),
+                                modifier = Modifier.padding(top = 8.dp),
+                            )
+
+                            groupSubjects.size == 1 && inviteSubject != null -> Surface(
+                                shape = RoundedCornerShape(14.dp),
+                                color = Color(0xFFF8FAFC),
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        Icons.Filled.School,
+                                        contentDescription = null,
+                                        tint = GroupAccent,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
+                                        Text(
+                                            inviteSubject.name,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GroupInk,
+                                        )
+                                        Text(
+                                            "Преподавателей: ${inviteSubject.teacherCount} из ${inviteSubject.teacherSlots}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = GroupMuted,
+                                        )
+                                    }
+                                }
+                            }
+
+                            else -> groupSubjects.forEach { subject ->
+                                val selected = subject.id == inviteSubjectId
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(top = 6.dp)
+                                        .background(
+                                            if (selected) Color(0xFFEEF2FF) else Color.Transparent,
+                                            RoundedCornerShape(12.dp),
+                                        )
+                                        .clickable {
+                                            inviteSubjectId = subject.id
+                                            inviteError = ""
+                                        }
+                                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RadioButton(
+                                        selected = selected,
+                                        onClick = {
+                                            inviteSubjectId = subject.id
+                                            inviteError = ""
+                                        },
+                                        colors = RadioButtonDefaults.colors(selectedColor = GroupAccent),
+                                    )
+                                    Column(modifier = Modifier.weight(1f).padding(start = 2.dp)) {
+                                        Text(
+                                            subject.name,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GroupInk,
+                                        )
+                                        Text(
+                                            "Преподавателей: ${subject.teacherCount} из ${subject.teacherSlots}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = GroupMuted,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(Modifier.height(18.dp))
+                        Text(
+                            "ТЕЛЕФОН ПРЕПОДАВАТЕЛЯ",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = GroupMuted,
+                        )
                         OutlinedTextField(
                             value = inviteContact,
                             onValueChange = {
@@ -618,91 +738,210 @@ fun GroupLibraryScreen(
                                 inviteError = ""
                             },
                             singleLine = true,
-                            label = { Text("Телефон или email") },
-                            modifier = Modifier.weight(1f),
+                            label = { Text("Телефон") },
+                            placeholder = { Text("+7 999 123-45-67") },
+                            leadingIcon = {
+                                Icon(Icons.Filled.Phone, contentDescription = null, tint = GroupMuted)
+                            },
+                            trailingIcon = {
+                                IconButton(onClick = { pickContact() }) {
+                                    Icon(
+                                        Icons.Filled.Contacts,
+                                        contentDescription = "Выбрать из контактов",
+                                        tint = GroupAccent,
+                                    )
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Phone,
+                                imeAction = ImeAction.Done,
+                            ),
+                            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                         )
-                        TextButton(onClick = { pickContact() }) { Text("Из контактов") }
-                    }
-                    if (inviteError.isNotBlank()) {
+                        Row(
+                            modifier = Modifier.padding(top = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Filled.Contacts,
+                                contentDescription = null,
+                                tint = GroupMuted,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Text(
+                                "Можно выбрать из контактов",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GroupMuted,
+                                modifier = Modifier.padding(start = 4.dp),
+                            )
+                        }
                         Text(
-                            inviteError,
-                            color = Color(0xFFB91C1C),
+                            "Только номер телефона. Email не используется.",
                             style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(top = 8.dp),
+                            color = GroupMuted,
+                            modifier = Modifier.padding(top = 4.dp),
                         )
+
+                        if (inviteError.isNotBlank()) {
+                            Text(
+                                inviteError,
+                                color = Color(0xFFB91C1C),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 10.dp),
+                            )
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 20.dp)
+                            .padding(bottom = 20.dp),
+                    ) {
+                        Button(
+                            enabled = inviteContact.isNotBlank() && inviteSubjectId.isNotBlank() && !inviteBusy,
+                            onClick = {
+                                inviteBusy = true
+                                inviteError = ""
+                                scope.launch {
+                                    when (val result = api.createTeacherInvite(group.id, inviteSubjectId, inviteContact)) {
+                                        is ApiResult.Ok -> {
+                                            createdInvite = result.value
+                                            showInvite = false
+                                        }
+                                        is ApiResult.Failure -> inviteError = result.message
+                                    }
+                                    inviteBusy = false
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = GroupAccent),
+                        ) {
+                            Text(
+                                if (inviteBusy) "Создаём…" else "Создать приглашение",
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
+                        TextButton(
+                            enabled = !inviteBusy,
+                            onClick = { showInvite = false },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("Отмена", color = GroupMuted)
+                        }
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = inviteContact.isNotBlank() && inviteSubjectId.isNotBlank() && !inviteBusy,
-                    onClick = {
-                        inviteBusy = true
-                        inviteError = ""
-                        scope.launch {
-                            when (val result = api.createTeacherInvite(group.id, inviteSubjectId, inviteContact)) {
-                                is ApiResult.Ok -> {
-                                    createdInvite = result.value
-                                    showInvite = false
-                                }
-                                is ApiResult.Failure -> inviteError = result.message
-                            }
-                            inviteBusy = false
-                        }
-                    },
-                ) { Text(if (inviteBusy) "Создаём…" else "Пригласить") }
-            },
-            dismissButton = {
-                TextButton(enabled = !inviteBusy, onClick = { showInvite = false }) { Text("Отмена") }
-            },
-        )
+            }
+        }
     }
 
     createdInvite?.let { invite ->
-        AlertDialog(
-            onDismissRequest = { createdInvite = null },
-            title = { Text("Приглашение создано") },
-            text = {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Dialog(onDismissRequest = { createdInvite = null }) {
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = Color.White,
+                shadowElevation = 10.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 620.dp)
+                        .verticalScroll(rememberScrollState())
+                        .padding(20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(52.dp)
+                            .background(Color(0xFFECFDF5), CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Filled.CheckCircle,
+                            contentDescription = null,
+                            tint = Color(0xFF059669),
+                            modifier = Modifier.size(30.dp),
+                        )
+                    }
                     Text(
-                        "Ссылка для ${invite.contactMasked}. Её можно отправить преподавателю.",
+                        "Приглашение готово",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.SemiBold,
+                        color = GroupInk,
+                        modifier = Modifier.padding(top = 10.dp),
+                    )
+                    Text(
+                        "Отправьте ссылку преподавателю — он примет её в приложении.",
                         style = MaterialTheme.typography.bodySmall,
                         color = GroupMuted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                    Text(
+                        "Ссылка для ${invite.contactMasked}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = GroupInk,
+                        modifier = Modifier.padding(top = 8.dp),
                     )
                     if (invite.acceptUrl.isNotBlank()) {
                         QrCodeImage(
                             content = invite.acceptUrl,
-                            size = 190.dp,
+                            size = 180.dp,
                             modifier = Modifier.padding(top = 12.dp),
                         )
-                        Text(
-                            invite.acceptUrl,
-                            style = MaterialTheme.typography.labelSmall,
-                            color = GroupAccent,
-                            modifier = Modifier.padding(top = 6.dp),
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                        )
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFF8FAFC),
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        ) {
+                            Text(
+                                invite.acceptUrl,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GroupAccent,
+                                modifier = Modifier.padding(10.dp),
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                    Button(
+                        onClick = {
+                            if (invite.acceptUrl.isNotBlank()) {
+                                shareText(
+                                    "Приглашаю Вас в группу «${group.name}» в QueryDoc как преподавателя предмета «${invite.subjectName}». " +
+                                        "Откройте ссылку и войдите или зарегистрируйтесь: ${invite.acceptUrl}",
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp).height(48.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = GroupAccent),
+                    ) {
+                        Text("Поделиться", fontWeight = FontWeight.SemiBold)
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            if (invite.acceptUrl.isNotBlank()) {
+                                copyText(invite.acceptUrl, "Ссылка-приглашение скопирована")
+                            }
+                            createdInvite = null
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(46.dp),
+                        shape = RoundedCornerShape(14.dp),
+                    ) {
+                        Text("Копировать")
+                    }
+                    TextButton(
+                        onClick = { createdInvite = null },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Готово", color = GroupMuted)
                     }
                 }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    if (invite.acceptUrl.isNotBlank()) {
-                        shareText(
-                            "Приглашаю тебя в группу «${group.name}» в QueryDoc как преподавателя предмета «${invite.subjectName}». " +
-                                "Открой ссылку и войди или зарегистрируйся: ${invite.acceptUrl}",
-                        )
-                    }
-                }) { Text("Поделиться") }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    if (invite.acceptUrl.isNotBlank()) copyText(invite.acceptUrl, "Ссылка-приглашение скопирована")
-                    createdInvite = null
-                }) { Text("Копировать") }
-            },
-        )
+            }
+        }
     }
 
     if (showQr && group.inviteCode.isNotBlank()) {
@@ -1088,18 +1327,6 @@ private fun readContactValue(context: Context, uri: Uri): String? {
         if (cursor.moveToFirst()) {
             val number = cursor.getString(0)?.trim()
             if (!number.isNullOrBlank()) return number
-        }
-    }
-    context.contentResolver.query(
-        ContactsContract.CommonDataKinds.Email.CONTENT_URI,
-        arrayOf(ContactsContract.CommonDataKinds.Email.ADDRESS),
-        "${ContactsContract.CommonDataKinds.Email.CONTACT_ID} = ?",
-        arrayOf(contactId),
-        null,
-    )?.use { cursor ->
-        if (cursor.moveToFirst()) {
-            val email = cursor.getString(0)?.trim()
-            if (!email.isNullOrBlank()) return email
         }
     }
     return null
