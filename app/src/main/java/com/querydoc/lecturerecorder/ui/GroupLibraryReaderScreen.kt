@@ -55,6 +55,7 @@ fun GroupLibraryReaderScreen(
     groupId: String,
     item: GroupLibraryItem,
     onBack: () -> Unit,
+    canTakeQuiz: Boolean = true,
 ) {
     var audio by remember(item.id) { mutableStateOf<AudioSessionSource?>(null) }
     var loadingAudio by remember(item.id) { mutableStateOf(true) }
@@ -167,6 +168,7 @@ fun GroupLibraryReaderScreen(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                if (canTakeQuiz) {
                 Button(
                     enabled = !quizLoading,
                     onClick = {
@@ -199,8 +201,9 @@ fun GroupLibraryReaderScreen(
                 ) {
                     Text(if (quizLoading) "Готовим…" else "Пройти проверку")
                 }
+                }
             }
-            if (quizError.isNotBlank()) {
+            if (canTakeQuiz && quizError.isNotBlank()) {
                 Text(
                     quizError,
                     color = Color(0xFF92400E),

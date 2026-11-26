@@ -1,5 +1,7 @@
 package com.querydoc.lecturerecorder.ui
 
+import android.content.Intent
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +36,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.RecordVoiceOver
 import androidx.compose.material.icons.filled.Refresh
@@ -63,11 +66,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.querydoc.lecturerecorder.BuildConfig
+import com.querydoc.lecturerecorder.config.AppLinks
 import com.querydoc.lecturerecorder.data.remote.ApiClient
 import com.querydoc.lecturerecorder.data.remote.AccountSummary
 import com.querydoc.lecturerecorder.data.remote.ApiResult
@@ -116,6 +123,7 @@ fun SettingsScreen(
     var showRetentionDialog by remember { mutableStateOf(false) }
     var showStorageLimitDialog by remember { mutableStateOf(false) }
     var clearAudioConfirm by remember { mutableStateOf(false) }
+    var showInviteApp by remember { mutableStateOf(false) }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
     var groups by remember { mutableStateOf<List<StudyGroupSummary>>(emptyList()) }
@@ -135,6 +143,8 @@ fun SettingsScreen(
     var inviteNotice by remember { mutableStateOf("") }
     var account by remember { mutableStateOf<AccountSummary?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
     var deleteDialog by remember { mutableStateOf(false) }
     var deletePassword by remember { mutableStateOf("") }
     var deleteBusy by remember { mutableStateOf(false) }
@@ -287,6 +297,16 @@ fun SettingsScreen(
                 )
             }
 
+            SettingsSection(title = "ДРУЗЬЯ") {
+                SettingRow(
+                    icon = Icons.Filled.PersonAdd,
+                    title = "Пригласить в приложение",
+                    subtitle = "Ссылка и QR на RuStore",
+                    onClick = { showInviteApp = true },
+                    trailing = { Chevron() },
+                )
+            }
+
             SettingsSection(title = "МИКРОФОН") {
                 SettingRow(
                     icon = Icons.Filled.Info,
@@ -361,124 +381,6 @@ fun SettingsScreen(
                     title = "Язык лекции",
                     subtitle = recognitionLanguage.label,
                     onClick = { showLanguageDialog = true },
-                    trailing = { Chevron() },
-                )
-            }
-
-            if (invites.isNotEmpty() || inviteNotice.isNotBlank() || inviteError.isNotBlank()) {
-                SettingsSection(title = "ПРИГЛАШЕНИЯ") {
-                    if (inviteError.isNotBlank()) {
-                        Text(
-                            inviteError,
-                            color = Color(0xFFDC2626),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        )
-                        SettingDivider()
-                    }
-                    if (inviteNotice.isNotBlank()) {
-                        Text(
-                            inviteNotice,
-                            color = Color(0xFF047857),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                        )
-                        SettingDivider()
-                    }
-                    invites.forEach { invite ->
-                        InviteRow(
-                            invite = invite,
-                            busy = inviteBusyId.isNotEmpty(),
-                            onAccept = {
-                                inviteBusyId = invite.id
-                                inviteError = ""
-                                inviteNotice = ""
-                                scope.launch {
-                                    when (val result = api.acceptTeacherInvite(invite.id)) {
-                                        is ApiResult.Ok -> {
-                                            invites = invites.filterNot { it.id == invite.id }
-                                            inviteNotice = "Вы приняли приглашение: ${invite.subjectName}."
-                                            when (val groupsResult = api.listStudyGroups()) {
-                                                is ApiResult.Ok -> groups = groupsResult.value
-                                                is ApiResult.Failure -> Unit
-                                            }
-                                        }
-                                        is ApiResult.Failure -> inviteError = result.message
-                                    }
-                                    inviteBusyId = ""
-                                }
-                            },
-                            onDecline = {
-                                inviteBusyId = invite.id
-                                inviteError = ""
-                                inviteNotice = ""
-                                scope.launch {
-                                    when (val result = api.declineTeacherInvite(invite.id)) {
-                                        is ApiResult.Ok -> {
-                                            invites = invites.filterNot { it.id == invite.id }
-                                            inviteNotice = "Приглашение отклонено: ${invite.subjectName}."
-                                        }
-                                        is ApiResult.Failure -> inviteError = result.message
-                                    }
-                                    inviteBusyId = ""
-                                }
-                            },
-                        )
-                        SettingDivider()
-                    }
-                }
-            }
-
-            SettingsSection(title = "ГРУППЫ") {
-                if (groupsError.isNotBlank()) {
-                    Text(
-                        groupsError,
-                        color = Color(0xFFB91C1C),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
-                    )
-                }
-                groups.forEach { group ->
-                    SettingRow(
-                        icon = Icons.Filled.Group,
-                        title = group.name,
-                        subtitle = when (group.role) {
-                            "owner" -> "Вы преподаватель · ${group.memberCount} студентов"
-                            "teacher" -> "Преподаватель · ${group.memberCount} студентов"
-                            else -> "Участник · ${group.memberCount} студентов"
-                        },
-                        onClick = { onOpenGroup(group) },
-                    )
-                    SettingDivider()
-                }
-                SettingRow(
-                    icon = Icons.Filled.Add,
-                    title = "Создать группу",
-                    subtitle = "Для преподавателя на платном тарифе",
-                    onClick = {
-                        groupName = ""
-                        groupCreateError = ""
-                        showCreateGroupDialog = true
-                    },
-                    trailing = { Chevron() },
-                )
-                SettingDivider()
-                SettingRow(
-                    icon = Icons.Filled.Refresh,
-                    title = "Обновить список",
-                    subtitle = "Если группа не появилась",
-                    onClick = { groupsReload += 1 },
-                )
-                SettingDivider()
-                SettingRow(
-                    icon = Icons.Filled.Group,
-                    title = "Присоединиться к группе",
-                    subtitle = "Введите код от преподавателя",
-                    onClick = {
-                        groupCode = ""
-                        groupError = ""
-                        showGroupDialog = true
-                    },
                     trailing = { Chevron() },
                 )
             }
@@ -660,6 +562,61 @@ fun SettingsScreen(
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { logoutConfirm = false }) { Text("Отмена") }
+            },
+        )
+    }
+
+    if (showInviteApp) {
+        AlertDialog(
+            onDismissRequest = { showInviteApp = false },
+            title = { Text("Пригласить в приложение") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        "Покажите QR-код или отправьте ссылку — друг откроет QueryDoc в RuStore.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF64748B),
+                    )
+                    QrCodeImage(
+                        content = AppLinks.RUSTORE,
+                        size = 220.dp,
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
+                    Text(
+                        "Наведите камеру на QR-код",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF64748B),
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
+                    Text(
+                        AppLinks.RUSTORE,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(0xFF4338CA),
+                        modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(
+                            Intent.EXTRA_TEXT,
+                            "QueryDoc — запись лекций и конспекты: ${AppLinks.RUSTORE}",
+                        )
+                    }
+                    context.startActivity(Intent.createChooser(send, "Пригласить в QueryDoc"))
+                }) { Text("Поделиться") }
+            },
+            dismissButton = {
+                TextButton(onClick = {
+                    clipboard.setText(AnnotatedString(AppLinks.RUSTORE))
+                    Toast.makeText(context, "Ссылка скопирована", Toast.LENGTH_SHORT).show()
+                    showInviteApp = false
+                }) { Text("Копировать ссылку") }
             },
         )
     }

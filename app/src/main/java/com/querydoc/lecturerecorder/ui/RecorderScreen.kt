@@ -460,18 +460,18 @@ fun RecorderScreen(
                     }
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Конспекты",
+                            text = "Материалы",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                             color = Color(0xFF1E1B4B),
                         )
                         Text(
-                            text = "Готовые лекции в одном месте",
+                            text = "Конспекты и группы",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFF64748B),
                         )
                     }
-                    Icon(Icons.Filled.ChevronRight, contentDescription = "Открыть конспекты", tint = Color(0xFF4338CA))
+                    Icon(Icons.Filled.ChevronRight, contentDescription = "Открыть материалы", tint = Color(0xFF4338CA))
                 }
             }
         }

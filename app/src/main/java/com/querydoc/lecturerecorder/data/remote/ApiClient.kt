@@ -253,6 +253,7 @@ data class StudyGroupSummary(
     val role: String,
     val memberCount: Int,
     val inviteCode: String,
+    val isMember: Boolean = false,
 )
 
 data class TeacherInviteSummary(
@@ -273,10 +274,27 @@ data class GroupTimelineEntry(
     val text: String,
 )
 
+data class GroupTeacher(
+    val userId: String,
+    val name: String,
+)
+
 data class GroupSubjectSummary(
     val id: String,
     val name: String,
     val teacherName: String,
+    val teacherUserId: String = "",
+    val teachers: List<GroupTeacher> = emptyList(),
+    val teacherCount: Int = 0,
+    val teacherSlots: Int = 0,
+    val canAddTeacher: Boolean = false,
+)
+
+data class TeacherInviteCreated(
+    val id: String,
+    val subjectName: String,
+    val contactMasked: String,
+    val acceptUrl: String,
 )
 
 data class GroupLibraryItem(
@@ -1311,13 +1329,135 @@ class ApiClient(context: Context) {
             val array = json.optJSONArray("subjects") ?: JSONArray()
             val subjects = (0 until array.length()).mapNotNull { index ->
                 val item = array.optJSONObject(index) ?: return@mapNotNull null
-                GroupSubjectSummary(
-                    id = item.optString("id"),
-                    name = item.optString("name"),
-                    teacherName = item.optString("teacherName"),
-                )
+                groupSubjectFromJson(item)
             }
             ApiResult.Ok(subjects)
+        }
+    }
+
+    fun webUrl(path: String): String =
+        "$baseUrl${if (path.startsWith("/")) path else "/$path"}"
+
+    private fun groupSubjectFromJson(item: JSONObject): GroupSubjectSummary {
+        val teachersArray = item.optJSONArray("teachers") ?: JSONArray()
+        val teachers = (0 until teachersArray.length()).mapNotNull { index ->
+            val teacher = teachersArray.optJSONObject(index) ?: return@mapNotNull null
+            GroupTeacher(
+                userId = teacher.optString("userId"),
+                name = teacher.optString("name"),
+            )
+        }
+        return GroupSubjectSummary(
+            id = item.optString("id"),
+            name = item.optString("name"),
+            teacherName = item.optString("teacherName"),
+            teacherUserId = item.optString("teacherUserId"),
+            teachers = teachers,
+            teacherCount = item.optInt("teacherCount", teachers.size),
+            teacherSlots = item.optInt("teacherSlots"),
+            canAddTeacher = item.optBoolean("canAddTeacher", false),
+        )
+    }
+
+    suspend fun createGroupSubject(
+        groupId: String,
+        name: String,
+        teacherContact: String = "",
+    ): ApiResult<GroupSubjectSummary> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val payload = JSONObject().put("name", name.trim())
+        if (teacherContact.isNotBlank()) payload.put("teacherContact", teacherContact.trim())
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/groups/$groupId/subjects")
+            .post(payload.toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val item = json?.optJSONObject("subject")
+            if (!response.isSuccessful || item == null) {
+                return@use ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось создать предмет" },
+                    response.code >= 500,
+                )
+            }
+            ApiResult.Ok(groupSubjectFromJson(item))
+        }
+    }
+
+    suspend fun assignGroupSubjectTeacher(
+        groupId: String,
+        subjectId: String,
+        teacherContact: String,
+    ): ApiResult<GroupSubjectSummary> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/v1/mobile/groups/$groupId/subjects")
+            .patch(
+                JSONObject()
+                    .put("subjectId", subjectId)
+                    .put("teacherContact", teacherContact.trim())
+                    .toString()
+                    .toRequestBody(JSON),
+            )
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val item = json?.optJSONObject("subject")
+            if (!response.isSuccessful || item == null) {
+                return@use ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось назначить преподавателя" },
+                    response.code >= 500,
+                )
+            }
+            ApiResult.Ok(groupSubjectFromJson(item))
+        }
+    }
+
+    suspend fun createTeacherInvite(
+        groupId: String,
+        subjectId: String,
+        contact: String,
+        message: String = "",
+    ): ApiResult<TeacherInviteCreated> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/teacher/groups/$groupId/invites")
+            .post(
+                JSONObject()
+                    .put("groupSubjectId", subjectId)
+                    .put("contact", contact.trim())
+                    .put("message", message.trim())
+                    .toString()
+                    .toRequestBody(JSON),
+            )
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            val invite = json?.optJSONObject("invite")
+            if (!response.isSuccessful || invite == null) {
+                return@use ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось создать приглашение" },
+                    response.code >= 500,
+                )
+            }
+            val acceptPath = json.optString("acceptPath")
+            ApiResult.Ok(
+                TeacherInviteCreated(
+                    id = invite.optString("id"),
+                    subjectName = invite.optString("groupSubjectName"),
+                    contactMasked = invite.optString("contactMasked"),
+                    acceptUrl = if (acceptPath.isNotBlank()) "$baseUrl$acceptPath" else "",
+                ),
+            )
         }
     }
 
@@ -1367,6 +1507,7 @@ class ApiClient(context: Context) {
                     role = item.optString("role"),
                     memberCount = item.optInt("memberCount"),
                     inviteCode = item.optString("inviteCode"),
+                    isMember = item.optBoolean("isMember", false),
                 )
             }
             ApiResult.Ok(groups)
@@ -1399,6 +1540,7 @@ class ApiClient(context: Context) {
                     role = item.optString("role"),
                     memberCount = item.optInt("memberCount"),
                     inviteCode = item.optString("inviteCode"),
+                    isMember = item.optBoolean("isMember", false),
                 ),
             )
         }
@@ -1429,6 +1571,7 @@ class ApiClient(context: Context) {
                     role = item.optString("role"),
                     memberCount = item.optInt("memberCount"),
                     inviteCode = item.optString("inviteCode"),
+                    isMember = item.optBoolean("isMember", true),
                 ),
             )
         }

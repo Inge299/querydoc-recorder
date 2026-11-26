@@ -43,6 +43,7 @@ import com.querydoc.lecturerecorder.ui.ConspectsScreen
 import com.querydoc.lecturerecorder.ui.IntroScreen
 import com.querydoc.lecturerecorder.ui.LegalScreen
 import com.querydoc.lecturerecorder.ui.LoginScreen
+import com.querydoc.lecturerecorder.ui.MaterialsScreen
 import com.querydoc.lecturerecorder.ui.NotificationsScreen
 import com.querydoc.lecturerecorder.ui.OnboardingScreen
 import com.querydoc.lecturerecorder.ui.SupportScreen
@@ -108,6 +109,7 @@ class MainActivity : ComponentActivity() {
             var permissionsRequested by remember { mutableStateOf(false) }
             var restoreAttempted by remember { mutableStateOf(false) }
             var showConspects by rememberSaveable { mutableStateOf(false) }
+            var showMaterials by rememberSaveable { mutableStateOf(false) }
             var showSettings by rememberSaveable { mutableStateOf(false) }
             var showPlans by rememberSaveable { mutableStateOf(false) }
             var showNotifications by rememberSaveable { mutableStateOf(false) }
@@ -199,6 +201,7 @@ class MainActivity : ComponentActivity() {
                 showNotifications -> "notifications"
                 showSettings -> "settings"
                 showConspects -> "conspects"
+                showMaterials -> "materials"
                 else -> "recorder"
             }
             LaunchedEffect(showConspects, readerSession) {
@@ -231,6 +234,9 @@ class MainActivity : ComponentActivity() {
             }
             BackHandler(enabled = showSettings) {
                 showSettings = false
+            }
+            BackHandler(enabled = showMaterials && groupLibraryGroup == null) {
+                showMaterials = false
             }
             BackHandler(enabled = readerSession == null && showConspects) {
                 showConspects = false
@@ -328,7 +334,7 @@ class MainActivity : ComponentActivity() {
                             onBrightnessRequested = ::applyScreenBrightness,
                             onRequestConspect = viewModel::requestConspect,
                             onDismissConspect = viewModel::dismissConspect,
-                            onOpenConspects = { showConspects = true },
+                            onOpenConspects = { showMaterials = true },
                             onRefreshUsage = viewModel::refreshUsage,
                             onOpenPlans = { showPlans = true },
                             onOpenSettings = { showSettings = true },
@@ -338,6 +344,12 @@ class MainActivity : ComponentActivity() {
                             onOpenNotifications = { showNotifications = true }
                         )
                             "legal" -> LegalScreen(onBack = { showLegal = false })
+                            "materials" -> MaterialsScreen(
+                                api = api,
+                                onBack = { showMaterials = false },
+                                onOpenConspects = { showConspects = true },
+                                onOpenGroup = { groupLibraryGroup = it },
+                            )
                             "settings" -> SettingsScreen(
                                 api = api,
                                 farLecturerMode = recorderState.farLecturerMode,
