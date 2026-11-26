@@ -52,6 +52,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
@@ -124,6 +125,10 @@ fun SettingsScreen(
     var showStorageLimitDialog by remember { mutableStateOf(false) }
     var clearAudioConfirm by remember { mutableStateOf(false) }
     var showInviteApp by remember { mutableStateOf(false) }
+    var showDisplayName by remember { mutableStateOf(false) }
+    var displayName by remember { mutableStateOf("") }
+    var displayNameBusy by remember { mutableStateOf(false) }
+    var displayNameError by remember { mutableStateOf("") }
     var usage by remember { mutableStateOf<UsageSummary?>(null) }
     var usageError by remember { mutableStateOf("") }
     var groups by remember { mutableStateOf<List<StudyGroupSummary>>(emptyList()) }
@@ -277,6 +282,19 @@ fun SettingsScreen(
                     title = "Сменить пароль",
                     subtitle = "Текущий и новый пароль",
                     onClick = { changePasswordOpen = true },
+                )
+                SettingDivider()
+                SettingRow(
+                    icon = Icons.Filled.Person,
+                    title = "Имя в группах",
+                    subtitle = account?.displayName?.takeIf { it.isNotBlank() }
+                        ?: "Не задано — покажем телефон",
+                    onClick = {
+                        displayName = account?.displayName.orEmpty()
+                        displayNameError = ""
+                        showDisplayName = true
+                    },
+                    trailing = { Chevron() },
                 )
             }
 
@@ -562,6 +580,64 @@ fun SettingsScreen(
             },
             dismissButton = {
                 androidx.compose.material3.TextButton(onClick = { logoutConfirm = false }) { Text("Отмена") }
+            },
+        )
+    }
+
+    if (showDisplayName) {
+        AlertDialog(
+            onDismissRequest = { if (!displayNameBusy) showDisplayName = false },
+            title = { Text("Имя в группах") },
+            text = {
+                Column {
+                    Text(
+                        "Так вас увидят участники групп. Телефон останется маскированным — видны только 4 последние цифры.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF64748B),
+                    )
+                    OutlinedTextField(
+                        value = displayName,
+                        onValueChange = {
+                            displayName = it.take(40)
+                            displayNameError = ""
+                        },
+                        singleLine = true,
+                        label = { Text("Имя или никнейм") },
+                        modifier = Modifier
+                            .padding(top = 12.dp)
+                            .fillMaxWidth(),
+                    )
+                    if (displayNameError.isNotBlank()) {
+                        Text(
+                            displayNameError,
+                            color = Color(0xFFB91C1C),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 8.dp),
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !displayNameBusy && displayName.trim().length != 1,
+                    onClick = {
+                        displayNameBusy = true
+                        displayNameError = ""
+                        scope.launch {
+                            when (val result = api.updateDisplayName(displayName)) {
+                                is ApiResult.Ok -> {
+                                    account = account?.copy(displayName = result.value)
+                                    showDisplayName = false
+                                }
+                                is ApiResult.Failure -> displayNameError = result.message
+                            }
+                            displayNameBusy = false
+                        }
+                    },
+                ) { Text(if (displayNameBusy) "Сохраняем…" else "Сохранить") }
+            },
+            dismissButton = {
+                TextButton(enabled = !displayNameBusy, onClick = { showDisplayName = false }) { Text("Отмена") }
             },
         )
     }

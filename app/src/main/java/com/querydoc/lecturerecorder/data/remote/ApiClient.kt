@@ -133,6 +133,7 @@ data class AccountSummary(
     val id: String = "",
     val phone: String = "",
     val email: String = "",
+    val displayName: String = "",
     val currentTariff: String = "",
     val tariffEndDate: String = "",
 )
@@ -402,8 +403,12 @@ class ApiClient(context: Context) {
         }
     }
 
-    suspend fun register(phone: String, password: String): ApiResult<AuthChallenge> = withContext(Dispatchers.IO) {
-        val body = JSONObject().put("login", phone.trim()).put("password", password).toString()
+    suspend fun register(phone: String, password: String, displayName: String = ""): ApiResult<AuthChallenge> = withContext(Dispatchers.IO) {
+        val body = JSONObject()
+            .put("login", phone.trim())
+            .put("password", password)
+            .put("displayName", displayName.trim())
+            .toString()
         val request = Request.Builder()
             .url("$baseUrl/api/auth/register")
             .post(body.toRequestBody(JSON))
@@ -914,6 +919,7 @@ class ApiClient(context: Context) {
                     id = userId,
                     phone = user.optString("phone"),
                     email = user.optString("email"),
+                    displayName = user.optString("displayName"),
                     currentTariff = user.optString("currentTariff"),
                     tariffEndDate = user.optString("tariffEndDate"),
                 ),
@@ -941,6 +947,28 @@ class ApiClient(context: Context) {
                     response.code,
                     json?.optString("code").orEmpty(),
                     json?.optString("error").orEmpty().ifBlank { "Не удалось изменить пароль" },
+                    response.code >= 500,
+                )
+            }
+        }
+    }
+
+    suspend fun updateDisplayName(displayName: String): ApiResult<String> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/profile")
+            .patch(JSONObject().put("displayName", displayName.trim()).toString().toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) {
+                ApiResult.Ok(json?.optString("displayName").orEmpty())
+            } else {
+                ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось сохранить имя" },
                     response.code >= 500,
                 )
             }

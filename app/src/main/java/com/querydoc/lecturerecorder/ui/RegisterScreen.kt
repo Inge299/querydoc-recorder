@@ -41,6 +41,7 @@ fun RegisterScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var phone by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var confirm by remember { mutableStateOf("") }
     var stage by remember { mutableStateOf("form") }
@@ -94,6 +95,14 @@ fun RegisterScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
                 modifier = Modifier.fillMaxWidth(),
             )
             OutlinedTextField(
+                value = displayName,
+                onValueChange = { displayName = it.take(40) },
+                label = { Text("Имя или никнейм (необязательно)") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text, imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            )
+            OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
                 label = { Text("Пароль") },
@@ -123,10 +132,14 @@ fun RegisterScreen(api: ApiClient, onBack: () -> Unit, onCompleted: () -> Unit) 
                         error = "Пароли не совпадают"
                         return@Button
                     }
+                    if (displayName.trim().length == 1) {
+                        error = "Имя или никнейм должен быть не короче 2 символов"
+                        return@Button
+                    }
                     busy = true
                     error = ""
                     scope.launch {
-                        when (val result = api.register(phone, password)) {
+                        when (val result = api.register(phone, password, displayName)) {
                             is ApiResult.Ok -> {
                                 if (result.value.callCheckId.isBlank()) {
                                     error = result.value.message.ifBlank { "Не удалось начать подтверждение телефона" }

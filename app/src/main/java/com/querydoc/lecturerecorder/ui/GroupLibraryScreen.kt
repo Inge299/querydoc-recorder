@@ -1,8 +1,15 @@
 package com.querydoc.lecturerecorder.ui
 
+import android.Manifest
+import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.provider.ContactsContract
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -60,6 +67,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.querydoc.lecturerecorder.config.AppLinks
 import com.querydoc.lecturerecorder.data.remote.AccountSummary
 import com.querydoc.lecturerecorder.data.remote.ApiClient
@@ -114,6 +122,33 @@ fun GroupLibraryScreen(
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
+
+    val contactPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickContact()) { uri ->
+        if (uri != null) {
+            val value = readContactValue(context, uri)
+            if (value.isNullOrBlank()) {
+                inviteError = "В выбранном контакте нет телефона или email"
+            } else {
+                inviteContact = value
+                inviteError = ""
+            }
+        }
+    }
+    val contactPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            contactPicker.launch(null)
+        } else {
+            inviteError = "Без доступа к контактам выберите получателя вручную"
+        }
+    }
+
+    fun pickContact() {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED) {
+            contactPicker.launch(null)
+        } else {
+            contactPermission.launch(Manifest.permission.READ_CONTACTS)
+        }
+    }
 
     val isOwner = group.role == "owner"
     val myContact = me?.phone?.takeIf { it.isNotBlank() }
@@ -569,18 +604,25 @@ fun GroupLibraryScreen(
                             modifier = Modifier.padding(top = 8.dp),
                         )
                     }
-                    OutlinedTextField(
-                        value = inviteContact,
-                        onValueChange = {
-                            inviteContact = it
-                            inviteError = ""
-                        },
-                        singleLine = true,
-                        label = { Text("Телефон или email преподавателя") },
+                    Row(
                         modifier = Modifier
                             .padding(top = 10.dp)
                             .fillMaxWidth(),
-                    )
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        OutlinedTextField(
+                            value = inviteContact,
+                            onValueChange = {
+                                inviteContact = it
+                                inviteError = ""
+                            },
+                            singleLine = true,
+                            label = { Text("Телефон или email") },
+                            modifier = Modifier.weight(1f),
+                        )
+                        TextButton(onClick = { pickContact() }) { Text("Из контактов") }
+                    }
                     if (inviteError.isNotBlank()) {
                         Text(
                             inviteError,
@@ -646,7 +688,12 @@ fun GroupLibraryScreen(
             },
             confirmButton = {
                 TextButton(onClick = {
-                    if (invite.acceptUrl.isNotBlank()) shareText(invite.acceptUrl)
+                    if (invite.acceptUrl.isNotBlank()) {
+                        shareText(
+                            "Приглашаю тебя в группу «${group.name}» в QueryDoc как преподавателя предмета «${invite.subjectName}». " +
+                                "Открой ссылку и войди или зарегистрируйся: ${invite.acceptUrl}",
+                        )
+                    }
                 }) { Text("Поделиться") }
             },
             dismissButton = {
@@ -1026,4 +1073,34 @@ private fun groupMembersLabel(count: Int): String = when {
     count == 1 -> "1 участник"
     count in 2..4 -> "$count участника"
     else -> "$count участников"
+}
+
+
+private fun readContactValue(context: Context, uri: Uri): String? {
+    val contactId = uri.lastPathSegment ?: return null
+    context.contentResolver.query(
+        ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+        arrayOf(ContactsContract.CommonDataKinds.Phone.NUMBER),
+        "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
+        arrayOf(contactId),
+        null,
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val number = cursor.getString(0)?.trim()
+            if (!number.isNullOrBlank()) return number
+        }
+    }
+    context.contentResolver.query(
+        ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+        arrayOf(ContactsContract.CommonDataKinds.Email.ADDRESS),
+        "${ContactsContract.CommonDataKinds.Email.CONTACT_ID} = ?",
+        arrayOf(contactId),
+        null,
+    )?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val email = cursor.getString(0)?.trim()
+            if (!email.isNullOrBlank()) return email
+        }
+    }
+    return null
 }
