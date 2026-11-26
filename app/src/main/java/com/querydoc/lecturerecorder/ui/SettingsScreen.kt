@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Mic
@@ -102,6 +103,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
 ) {
     var logoutConfirm by remember { mutableStateOf(false) }
+    var changePasswordOpen by remember { mutableStateOf(false) }
     var showMicModeDialog by remember { mutableStateOf(false) }
     var showAcousticDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
@@ -419,6 +421,13 @@ fun SettingsScreen(
 
             SettingsSection(title = "АККАУНТ") {
                 SettingRow(
+                    icon = Icons.Filled.Lock,
+                    title = "Сменить пароль",
+                    subtitle = "Текущий и новый пароль",
+                    onClick = { changePasswordOpen = true },
+                )
+                SettingDivider()
+                SettingRow(
                     icon = Icons.Filled.Logout,
                     title = "Выйти из аккаунта",
                     subtitle = "Потребуется снова ввести пароль",
@@ -670,6 +679,10 @@ fun SettingsScreen(
                 TextButton(onClick = { if (!deleteBusy) deleteDialog = false }) { Text("Отмена") }
             },
         )
+    }
+
+    if (changePasswordOpen) {
+        ChangePasswordDialog(api = api, onDismiss = { changePasswordOpen = false })
     }
 }
 
