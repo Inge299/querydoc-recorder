@@ -819,6 +819,32 @@ class ApiClient(context: Context) {
         }
     }
 
+    suspend fun changePassword(currentPassword: String, newPassword: String): ApiResult<Unit> = withContext(Dispatchers.IO) {
+        if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
+        val body = JSONObject()
+            .put("currentPassword", currentPassword)
+            .put("newPassword", newPassword)
+            .toString()
+        val request = Request.Builder()
+            .url("$baseUrl/api/auth/change-password")
+            .post(body.toRequestBody(JSON))
+            .build()
+        val response = execute(request) ?: return@withContext networkFailure()
+        response.use { response ->
+            val json = runCatching { JSONObject(response.body?.string().orEmpty()) }.getOrNull()
+            if (response.isSuccessful) {
+                ApiResult.Ok(Unit)
+            } else {
+                ApiResult.Failure(
+                    response.code,
+                    json?.optString("code").orEmpty(),
+                    json?.optString("error").orEmpty().ifBlank { "Не удалось изменить пароль" },
+                    response.code >= 500,
+                )
+            }
+        }
+    }
+
     suspend fun notifications(): ApiResult<InboxPayload> = withContext(Dispatchers.IO) {
         if (!ensureSession()) return@withContext ApiResult.Failure(401, "auth_required", "Войдите снова", false)
         val request = Request.Builder().url("$baseUrl/api/v1/mobile/notifications").get().build()
