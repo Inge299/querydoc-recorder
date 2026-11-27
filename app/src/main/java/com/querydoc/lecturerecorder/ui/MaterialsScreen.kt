@@ -64,6 +64,9 @@ private val Accent = Color(0xFF4338CA)
 private val Paper = Color(0xFFFFFFFF)
 private val Canvas = Color(0xFFF4F6FB)
 
+/** Mirrors the server rule in `app/api/v1/mobile/groups/route.ts`. */
+private const val FREE_PLAN_ID = "free"
+
 @Composable
 fun MaterialsScreen(
     api: ApiClient,
@@ -88,11 +91,16 @@ fun MaterialsScreen(
     var joinCode by remember { mutableStateOf("") }
     var joinError by remember { mutableStateOf("") }
     var joinBusy by remember { mutableStateOf(false) }
+    var planId by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(reload) {
         loading = true
         groupsError = ""
+        when (val result = api.usage()) {
+            is ApiResult.Ok -> planId = result.value.planId
+            is ApiResult.Failure -> Unit
+        }
         when (val result = api.listStudyGroups()) {
             is ApiResult.Ok -> groups = result.value
             is ApiResult.Failure -> groupsError = result.message
@@ -264,7 +272,11 @@ fun MaterialsScreen(
                 }
             }
             Text(
-                "Создать группу можно на платном тарифе. Предметы и преподаватели настраиваются внутри группы.",
+                if (planId == FREE_PLAN_ID) {
+                    "Создать группу можно на платном тарифе. Предметы и преподаватели настраиваются внутри группы."
+                } else {
+                    "Предметы и преподаватели настраиваются внутри группы."
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = Muted,
                 modifier = Modifier.padding(top = 10.dp),
