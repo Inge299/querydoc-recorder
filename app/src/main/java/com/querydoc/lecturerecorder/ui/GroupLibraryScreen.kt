@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -34,8 +35,11 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.Delete
@@ -50,6 +54,8 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -72,6 +78,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -134,6 +141,9 @@ fun GroupLibraryScreen(
     var inviteError by remember { mutableStateOf("") }
     var createdInvite by remember { mutableStateOf<TeacherInviteCreated?>(null) }
     var showQr by remember { mutableStateOf(false) }
+    var showInviteChooser by remember { mutableStateOf(false) }
+    var selectedSubject by remember { mutableStateOf<GroupSubjectSummary?>(null) }
+    var showInviteSubjectMenu by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -305,9 +315,15 @@ fun GroupLibraryScreen(
                     Icon(Icons.Filled.Add, contentDescription = "Добавить конспект", tint = GroupAccent)
                 }
             }
-            if (isOwner && group.inviteCode.isNotBlank()) {
-                IconButton(onClick = { showQr = true }) {
-                    Icon(Icons.Filled.QrCode2, contentDescription = "Код и QR группы", tint = GroupAccent)
+            if (isOwner) {
+                OutlinedButton(
+                    onClick = { showInviteChooser = true },
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                ) {
+                    Icon(Icons.Filled.PersonAdd, contentDescription = null, tint = GroupAccent, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.size(4.dp))
+                    Text("Пригласить", style = MaterialTheme.typography.labelMedium, color = GroupAccent)
                 }
             }
         }
@@ -321,6 +337,57 @@ fun GroupLibraryScreen(
         ) {
             TabPill("Библиотека", tab == "library", Modifier.weight(1f)) { tab = "library" }
             TabPill("Предметы", tab == "subjects", Modifier.weight(1f)) { tab = "subjects" }
+        }
+
+        if (isOwner) {
+            val hasSubjects = groupSubjects.isNotEmpty()
+            val hasTeacher = groupSubjects.any { it.teachers.isNotEmpty() || it.teacherUserId.isNotBlank() }
+            val hasStudents = group.memberCount > 0
+            val doneCount = listOf(hasSubjects, hasTeacher, hasStudents).count { it }
+            if (doneCount < 3) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = GroupPaper),
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Filled.Checklist, contentDescription = null, tint = GroupAccent, modifier = Modifier.size(18.dp))
+                            Text(
+                                "Настройте группу",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold,
+                                color = GroupInk,
+                                modifier = Modifier.padding(start = 6.dp).weight(1f),
+                            )
+                            Text(
+                                "$doneCount из 3",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GroupMuted,
+                            )
+                        }
+                        if (!hasSubjects) {
+                            SetupStep("Добавьте предметы", false, "Добавить") {
+                                tab = "subjects"
+                                subjectName = ""
+                                subjectAsTeacher = true
+                                subjectError = ""
+                                showCreateSubject = true
+                            }
+                        }
+                        if (!hasTeacher) {
+                            SetupStep("Назначьте преподавателя", false, "Пригласить") {
+                                showInviteChooser = true
+                            }
+                        }
+                        if (!hasStudents) {
+                            SetupStep("Пригласите студентов", false, "Код") {
+                                showQr = true
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         if (actionMessage.isNotBlank()) {
@@ -365,12 +432,7 @@ fun GroupLibraryScreen(
                 amTeacher = ::amTeacher,
                 assigningSubjectId = assigningSubjectId,
                 onAssignSelf = ::assignSelf,
-                onInvite = { subject ->
-                    inviteSubjectId = subject.id
-                    inviteContact = ""
-                    inviteError = ""
-                    showInvite = true
-                },
+                onOpenSubject = { selectedSubject = it },
                 onAddSubject = {
                     subjectName = ""
                     subjectAsTeacher = true
@@ -498,6 +560,125 @@ fun GroupLibraryScreen(
                 TextButton(enabled = !deleteBusy, onClick = { pendingDelete = null }) { Text("Отмена") }
             },
         )
+    }
+
+    if (showInviteChooser) {
+        Dialog(onDismissRequest = { showInviteChooser = false }) {
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = Color.White,
+                shadowElevation = 10.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                    Text("Пригласить", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = GroupInk)
+                    Text("Выберите, кого пригласить.", style = MaterialTheme.typography.bodySmall, color = GroupMuted, modifier = Modifier.padding(top = 2.dp))
+                    InviteChoice(
+                        icon = Icons.Filled.School,
+                        title = "Преподавателя",
+                        subtitle = "Ссылка или приглашение",
+                        onClick = {
+                            showInviteChooser = false
+                            inviteSubjectId = groupSubjects.firstOrNull()?.id.orEmpty()
+                            inviteContact = ""
+                            inviteError = ""
+                            showInvite = true
+                        },
+                    )
+                    if (group.inviteCode.isNotBlank()) {
+                        InviteChoice(
+                            icon = Icons.Filled.QrCode2,
+                            title = "Студентов",
+                            subtitle = "Показать код и QR",
+                            onClick = {
+                                showInviteChooser = false
+                                showQr = true
+                            },
+                        )
+                    }
+                    TextButton(
+                        onClick = { showInviteChooser = false },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Отмена", color = GroupMuted) }
+                }
+            }
+        }
+    }
+
+    selectedSubject?.let { subject ->
+        val mine = amTeacher(subject)
+        val names = subject.teachers.mapNotNull { it.name.takeIf { name -> name.isNotBlank() } }
+        Dialog(onDismissRequest = { selectedSubject = null }) {
+            Surface(
+                shape = RoundedCornerShape(26.dp),
+                color = Color.White,
+                shadowElevation = 10.dp,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(modifier = Modifier.fillMaxWidth().padding(20.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier.size(46.dp).background(Color(0xFFEEF2FF), RoundedCornerShape(15.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Filled.School, contentDescription = null, tint = GroupAccent, modifier = Modifier.size(24.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
+                            Text(subject.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, color = GroupInk)
+                            Text("Преподавателей: ${subject.teacherCount} из ${subject.teacherSlots}", style = MaterialTheme.typography.bodySmall, color = GroupMuted)
+                        }
+                        IconButton(onClick = { selectedSubject = null }) {
+                            Icon(Icons.Filled.Close, contentDescription = "Закрыть", tint = GroupMuted)
+                        }
+                    }
+                    Text(
+                        if (names.isEmpty()) "Преподаватель не назначен" else names.joinToString(", "),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (names.isEmpty()) Color(0xFFB45309) else GroupMuted,
+                        modifier = Modifier.padding(top = 14.dp),
+                    )
+                    if (isOwner) {
+                        if (!mine) {
+                            Button(
+                                onClick = {
+                                    assignSelf(subject)
+                                    selectedSubject = null
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(top = 14.dp).height(46.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = GroupAccent),
+                            ) { Text("Назначить себя") }
+                        }
+                        if (subject.canAddTeacher) {
+                            OutlinedButton(
+                                onClick = {
+                                    selectedSubject = null
+                                    inviteSubjectId = subject.id
+                                    inviteContact = ""
+                                    inviteError = ""
+                                    showInvite = true
+                                },
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(46.dp),
+                                shape = RoundedCornerShape(12.dp),
+                            ) { Text("Пригласить преподавателя") }
+                        }
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            selectedSubject = null
+                            filterSubjectId = subject.id
+                            tab = "library"
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).height(46.dp),
+                        shape = RoundedCornerShape(12.dp),
+                    ) { Text("Открыть библиотеку") }
+                    TextButton(
+                        onClick = { selectedSubject = null },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) { Text("Закрыть", color = GroupMuted) }
+                }
+            }
+        }
     }
 
     if (showCreateSubject) {
@@ -636,98 +817,67 @@ fun GroupLibraryScreen(
                             modifier = Modifier.padding(top = 2.dp),
                         )
 
-                        Spacer(Modifier.height(18.dp))
+                        Spacer(Modifier.height(16.dp))
                         Text(
-                            "ПРЕДМЕТ",
-                            style = MaterialTheme.typography.labelSmall,
+                            "Предмет",
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = GroupMuted,
                         )
-                        when {
-                            groupSubjects.isEmpty() -> Text(
-                                "Сначала добавьте предмет на вкладке «Предметы».",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color(0xFFB45309),
-                                modifier = Modifier.padding(top = 8.dp),
-                            )
-
-                            groupSubjects.size == 1 && inviteSubject != null -> Surface(
-                                shape = RoundedCornerShape(14.dp),
-                                color = Color(0xFFF8FAFC),
-                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        Box(modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                            OutlinedButton(
+                                onClick = { showInviteSubjectMenu = true },
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp),
                             ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    Icon(
-                                        Icons.Filled.School,
-                                        contentDescription = null,
-                                        tint = GroupAccent,
-                                        modifier = Modifier.size(20.dp),
-                                    )
-                                    Column(modifier = Modifier.weight(1f).padding(start = 8.dp)) {
-                                        Text(
-                                            inviteSubject.name,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GroupInk,
-                                        )
-                                        Text(
-                                            "Преподавателей: ${inviteSubject.teacherCount} из ${inviteSubject.teacherSlots}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = GroupMuted,
-                                        )
-                                    }
-                                }
+                                Icon(Icons.Filled.School, contentDescription = null, tint = GroupAccent, modifier = Modifier.size(18.dp))
+                                Text(
+                                    inviteSubject?.name ?: "Выберите предмет",
+                                    modifier = Modifier.weight(1f).padding(start = 8.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = GroupInk,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                Icon(Icons.Filled.ArrowDropDown, contentDescription = null, tint = GroupMuted)
                             }
-
-                            else -> groupSubjects.forEach { subject ->
-                                val selected = subject.id == inviteSubjectId
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(top = 6.dp)
-                                        .background(
-                                            if (selected) Color(0xFFEEF2FF) else Color.Transparent,
-                                            RoundedCornerShape(12.dp),
-                                        )
-                                        .clickable {
-                                            inviteSubjectId = subject.id
-                                            inviteError = ""
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                ) {
-                                    RadioButton(
-                                        selected = selected,
+                            DropdownMenu(
+                                expanded = showInviteSubjectMenu,
+                                onDismissRequest = { showInviteSubjectMenu = false },
+                                modifier = Modifier.heightIn(max = 360.dp),
+                            ) {
+                                groupSubjects.forEach { subject ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                subject.name,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        },
                                         onClick = {
                                             inviteSubjectId = subject.id
+                                            showInviteSubjectMenu = false
                                             inviteError = ""
                                         },
-                                        colors = RadioButtonDefaults.colors(selectedColor = GroupAccent),
                                     )
-                                    Column(modifier = Modifier.weight(1f).padding(start = 2.dp)) {
-                                        Text(
-                                            subject.name,
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GroupInk,
-                                        )
-                                        Text(
-                                            "Преподавателей: ${subject.teacherCount} из ${subject.teacherSlots}",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = GroupMuted,
-                                        )
-                                    }
                                 }
                             }
+                        }
+                        if (groupSubjects.isEmpty()) {
+                            Text(
+                                "Сначала добавьте предмет.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = Color(0xFFB45309),
+                                modifier = Modifier.padding(top = 6.dp),
+                            )
                         }
 
                         Spacer(Modifier.height(18.dp))
                         Text(
-                            "ТЕЛЕФОН ПРЕПОДАВАТЕЛЯ",
-                            style = MaterialTheme.typography.labelSmall,
+                            "Телефон",
+                            style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.SemiBold,
                             color = GroupMuted,
                         )
@@ -758,28 +908,11 @@ fun GroupLibraryScreen(
                             ),
                             modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
                         )
-                        Row(
-                            modifier = Modifier.padding(top = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                Icons.Filled.Contacts,
-                                contentDescription = null,
-                                tint = GroupMuted,
-                                modifier = Modifier.size(14.dp),
-                            )
-                            Text(
-                                "Можно выбрать из контактов",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GroupMuted,
-                                modifier = Modifier.padding(start = 4.dp),
-                            )
-                        }
                         Text(
-                            "Только номер телефона. Email не используется.",
+                            "Только телефон. Контакт — справа.",
                             style = MaterialTheme.typography.bodySmall,
                             color = GroupMuted,
-                            modifier = Modifier.padding(top = 4.dp),
+                            modifier = Modifier.padding(top = 6.dp),
                         )
 
                         if (inviteError.isNotBlank()) {
@@ -819,7 +952,7 @@ fun GroupLibraryScreen(
                             colors = ButtonDefaults.buttonColors(containerColor = GroupAccent),
                         ) {
                             Text(
-                                if (inviteBusy) "Создаём…" else "Создать приглашение",
+                                if (inviteBusy) "Создаём…" else "Пригласить",
                                 fontWeight = FontWeight.SemiBold,
                             )
                         }
@@ -952,7 +1085,7 @@ fun GroupLibraryScreen(
             text = {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        "Студенты вступают по коду или QR. Код действует, пока вы его не смените.",
+                        "Студенты вступают по коду или QR.",
                         style = MaterialTheme.typography.bodySmall,
                         color = GroupMuted,
                     )
@@ -1152,7 +1285,7 @@ private fun SubjectsTab(
     amTeacher: (GroupSubjectSummary) -> Boolean,
     assigningSubjectId: String,
     onAssignSelf: (GroupSubjectSummary) -> Unit,
-    onInvite: (GroupSubjectSummary) -> Unit,
+    onOpenSubject: (GroupSubjectSummary) -> Unit,
     onAddSubject: () -> Unit,
 ) {
     Column(
@@ -1160,16 +1293,19 @@ private fun SubjectsTab(
             .fillMaxSize()
             .verticalScroll(rememberScrollState()),
     ) {
-        Text(
-            if (isOwner) {
-                "Предметы группы. Назначьте себя преподавателем или пригласите коллегу."
-            } else {
-                "Предметы и преподаватели группы."
-            },
-            style = MaterialTheme.typography.bodySmall,
-            color = GroupMuted,
-            modifier = Modifier.padding(vertical = 6.dp),
-        )
+        if (isOwner) {
+            Button(
+                onClick = onAddSubject,
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                shape = RoundedCornerShape(12.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = GroupAccent),
+            ) {
+                Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.size(6.dp))
+                Text("Добавить предмет")
+            }
+            Spacer(Modifier.height(10.dp))
+        }
         if (subjects.isEmpty()) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -1177,9 +1313,7 @@ private fun SubjectsTab(
                 colors = CardDefaults.cardColors(containerColor = GroupPaper),
             ) {
                 Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 18.dp, vertical = 24.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Icon(Icons.Filled.School, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(34.dp))
@@ -1196,104 +1330,69 @@ private fun SubjectsTab(
                         color = GroupMuted,
                         modifier = Modifier.padding(top = 4.dp),
                     )
-                    if (isOwner) {
-                        Button(
-                            onClick = onAddSubject,
-                            modifier = Modifier.padding(top = 14.dp),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = GroupAccent),
-                        ) {
-                            Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.size(6.dp))
-                            Text("Добавить предмет")
-                        }
-                    }
                 }
             }
         } else {
             subjects.forEach { subject ->
                 val mine = amTeacher(subject)
+                val names = subject.teachers.mapNotNull { it.name.takeIf { name -> name.isNotBlank() } }
+                val teacherLabel = when {
+                    mine -> "Вы преподаватель"
+                    names.isNotEmpty() -> names.joinToString(", ")
+                    else -> "Преподаватель не назначен"
+                }
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp),
+                        .padding(bottom = 8.dp)
+                        .clickable { onOpenSubject(subject) },
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = GroupPaper),
                 ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .background(Color(0xFFEEF2FF), RoundedCornerShape(12.dp)),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Filled.School, contentDescription = null, tint = GroupAccent, modifier = Modifier.size(20.dp))
+                        }
+                        Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
                             Text(
                                 subject.name,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.SemiBold,
                                 color = GroupInk,
-                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
                             )
-                            if (mine) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(3.dp),
-                                ) {
-                                    Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFF047857), modifier = Modifier.size(15.dp))
-                                    Text(
-                                        "Вы преподаватель",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color(0xFF047857),
-                                    )
-                                }
-                            }
+                            Text(
+                                teacherLabel,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (names.isEmpty() && !mine) Color(0xFFB45309) else GroupMuted,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
                         }
-                        val names = subject.teachers.mapNotNull { it.name.takeIf { name -> name.isNotBlank() } }
-                        Text(
-                            if (names.isEmpty()) "Преподаватель не назначен" else names.joinToString(", "),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (names.isEmpty()) Color(0xFFB45309) else GroupMuted,
-                            modifier = Modifier.padding(top = 3.dp),
-                        )
-                        if (isOwner) {
-                            Row(
-                                modifier = Modifier.padding(top = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        if (isOwner && !mine) {
+                            TextButton(
+                                enabled = assigningSubjectId.isBlank(),
+                                onClick = { onAssignSelf(subject) },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
                             ) {
-                                if (!mine) {
-                                    TextButton(
-                                        enabled = assigningSubjectId.isBlank(),
-                                        onClick = { onAssignSelf(subject) },
-                                    ) {
-                                        Text(
-                                            if (assigningSubjectId == subject.id) "Назначаем…" else "Назначить себя",
-                                        )
-                                    }
-                                }
-                                if (subject.canAddTeacher) {
-                                    TextButton(onClick = { onInvite(subject) }) {
-                                        Text("Пригласить преподавателя")
-                                    }
-                                } else if (!mine) {
-                                    Text(
-                                        "Лимит преподавателей",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = GroupMuted,
-                                        modifier = Modifier.padding(start = 4.dp, top = 12.dp),
-                                    )
-                                }
+                                Text(
+                                    if (assigningSubjectId == subject.id) "…" else "Назначить",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = GroupAccent,
+                                )
                             }
                         }
+                        Icon(Icons.Filled.ChevronRight, contentDescription = "Открыть предмет", tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
                     }
-                }
-            }
-            if (isOwner) {
-                Button(
-                    onClick = onAddSubject,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    shape = RoundedCornerShape(12.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = GroupAccent),
-                ) {
-                    Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Добавить предмет")
                 }
             }
         }
@@ -1330,4 +1429,72 @@ private fun readContactValue(context: Context, uri: Uri): String? {
         }
     }
     return null
+}
+
+
+@Composable
+private fun SetupStep(
+    title: String,
+    done: Boolean,
+    action: String,
+    onAction: () -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(18.dp)
+                .background(if (done) Color(0xFFD1FAE5) else Color(0xFFF1F5F9), CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (done) {
+                Icon(Icons.Filled.Check, contentDescription = null, tint = Color(0xFF047857), modifier = Modifier.size(12.dp))
+            }
+        }
+        Text(
+            title,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (done) GroupMuted else GroupInk,
+            modifier = Modifier.weight(1f).padding(start = 8.dp),
+        )
+        TextButton(
+            onClick = onAction,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+        ) {
+            Text(action, style = MaterialTheme.typography.labelSmall, color = GroupAccent)
+        }
+    }
+}
+
+
+@Composable
+private fun InviteChoice(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp)
+            .background(Color(0xFFF8FAFC), RoundedCornerShape(14.dp))
+            .clickable(onClick = onClick)
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier.size(40.dp).background(Color(0xFFEEF2FF), RoundedCornerShape(12.dp)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, contentDescription = null, tint = GroupAccent, modifier = Modifier.size(20.dp))
+        }
+        Column(modifier = Modifier.weight(1f).padding(start = 10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = GroupInk)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall, color = GroupMuted)
+        }
+        Icon(Icons.Filled.ChevronRight, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
+    }
 }
